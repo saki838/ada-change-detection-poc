@@ -19,3 +19,4 @@ external/
 !data/levir_cd/**/.gitkeep
 !data/site/.gitkeep
 !outputs/.gitkeep
+data/site/_levir_sample_test/
