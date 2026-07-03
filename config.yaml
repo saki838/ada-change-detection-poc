@@ -1,0 +1,48 @@
+# Central config for the ADA change-detection POC pipeline.
+# CLI flags override these where both exist (see src/pipeline.py --help).
+
+stage0_align:
+  target_resolution_m: 0.5      # ground sample distance to resample both rasters to
+  resampling_method: bilinear    # rasterio.enums.Resampling name
+
+stage1_change_detection:
+  model: bit                     # bit | changeformer | dummy_diff
+  weights_path: weights/bit_levir.pt
+  device: cuda                   # cuda | cpu — auto-falls back to cpu if no GPU is found
+  input_size: 256                # BIT/ChangeFormer expect fixed tile size; we tile+stitch
+  tile_overlap: 32
+  binarize_threshold: 0.5
+
+stage2_region_extraction:
+  min_area_px: 150               # drop specks/noise below this pixel area
+  morphology_kernel: 5           # opening/closing kernel size to clean the mask
+  approx_epsilon: 2.0            # contour polygon simplification tolerance (px)
+
+stage3_segment_classify:
+  segmenter: sam2                # sam2 | dummy_contour
+  sam_checkpoint: weights/sam2.1_tiny.pt
+  sam_model_cfg: configs/sam2.1/sam2.1_hiera_t.yaml
+  classifier: dummy_rule              # rtdetr | efficientdet | dummy_rule
+  classifier_weights: weights/rtdetr_violations.pt
+  class_names:
+    - illegal_build
+    - encroachment
+    - unauthorized_paving
+    - vegetation_clearance
+    - other_change
+  device: cuda                   # cuda | cpu — auto-falls back to cpu if no GPU (SAM2 is slow on CPU)
+
+stage4_measurement:
+  parcel_boundary: data/site/parcel_boundary.geojson
+  red_zone_boundary: data/site/red_zone_boundary.geojson   # optional, may be null
+  setback_distance_m: 3.0        # required setback from parcel edge, per local rule
+  gsd_source: metadata            # metadata | config (use raster tags, or force below)
+  forced_gsd_m: null              # only used if gsd_source == config
+
+stage5_report:
+  out_formats: [geojson, overlay_png, summary_csv]
+  overlay_alpha: 0.45
+  overlay_mask_color: [255, 0, 0]
+
+acceptance:
+  min_f1: 0.85                    # Definition of Done sanity metric, Section 6

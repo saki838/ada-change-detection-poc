@@ -1,0 +1,39 @@
+# --- core / geo (Track B) ---
+numpy>=1.26
+opencv-python-headless>=4.9
+rasterio>=1.3
+shapely>=2.0
+geopandas>=0.14
+pyproj>=3.6
+
+# --- ML / models (Track A) ---
+torch>=2.2
+torchvision>=0.17
+safetensors>=0.4
+transformers>=4.44        # RT-DETR (RTDetrForObjectDetection)
+# SAM 2.1 is not on PyPI as of writing — install from source on the workstation:
+#   git clone https://github.com/facebookresearch/sam2.git && pip install -e sam2
+# then uncomment the line below once installed locally, or leave commented and
+# rely on the dummy segmenter until it's set up.
+# sam2 @ git+https://github.com/facebookresearch/sam2.git
+
+# --- reporting / viz ---
+pandas>=2.2
+matplotlib>=3.8
+Pillow>=10.3
+
+# --- data download ---
+datasets>=2.19        # for scripts/download_levir_cd.py (huggingface datasets)
+
+# --- config / cli ---
+pyyaml>=6.0
+tqdm>=4.66
+
+# --- API (Swagger UI) ---
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9   # required by FastAPI for file uploads
+
+# --- dev / test ---
+pytest>=8.0
+httpx>=0.27                # required by FastAPI's TestClient

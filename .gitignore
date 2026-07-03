@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# large / generated — don't commit
+weights/*.pt
+weights/*.safetensors
+data/levir_cd/**/*.png
+data/levir_cd/**/*.tif
+data/site/*.tif
+data/site/_synthetic_demo/
+outputs/*/
+external/
+
+!weights/.gitkeep
+!data/levir_cd/**/.gitkeep
+!data/site/.gitkeep
+!outputs/.gitkeep
