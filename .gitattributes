@@ -1,0 +1,14 @@
+# Auto-detect text files and normalize to LF in the repo
+# (Windows checkouts will still get CRLF automatically)
+* text=auto
+
+# Explicitly declare binary files (no line-ending conversion)
+*.png binary
+*.svg binary
+*.tif binary
+*.pt binary
+*.safetensors binary
+*.db binary
+*.db-shm binary
+*.db-wal binary
+*.geojson binary
