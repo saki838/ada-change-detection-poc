@@ -166,6 +166,7 @@ class CaseService:
         status: Optional[str] = None,
         zone_type: Optional[str] = None,
         severity: Optional[str] = None,
+        assigned_to: Optional[str] = None,
     ) -> int:
         """Count cases matching filters."""
         query = session.query(Case)
@@ -175,6 +176,8 @@ class CaseService:
             query = query.filter(Case.zone_type == zone_type)
         if severity:
             query = query.filter(Case.severity == severity)
+        if assigned_to:
+            query = query.filter(Case.assigned_to == assigned_to)
         return query.count()
 
     # ── Case Workflow ───────────────────────────────────────────

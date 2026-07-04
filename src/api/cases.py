@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from src.api.auth import _require_auth, _require_role
 from src.database.connection import get_engine
-from src.database.models import Case, PipelineRun, UserRole, init_db
+from src.database.models import Case, CaseStatus, PipelineRun, UserRole, init_db
 
 from src.services.case_service import CaseService
 from src.services.notice_generator import generate_notice, save_notice_record
@@ -129,6 +129,17 @@ def _get_session():
     return Session(engine)
 
 
+def _officer_name(full_name: str) -> str:
+    """Extract the base officer name from a full_name that may have a role suffix.
+
+    Seed data example:
+      full_name = "Amit Sharma — Enforcement Officer"  →  returns "Amit Sharma"
+    """
+    if " —" in full_name:
+        return full_name.split(" —")[0].strip()
+    return full_name.strip()
+
+
 def _case_to_response(case) -> CaseResponse:
     """Convert a Case ORM object to a CaseResponse schema."""
     return CaseResponse(
@@ -176,15 +187,25 @@ def list_cases(
     limit: int = Query(100, ge=1, le=1000, description="Max results"),
     offset: int = Query(0, ge=0, description="Results offset"),
 ):
-    """List cases with optional filters. Most recent cases first."""
+    """List cases with optional filters. Most recent cases first.
+
+    Enforcement officers only see cases assigned to them. Admins and
+    supervisors see all cases.
+    """
     with _get_session() as session:
         service = CaseService()
+
+        # Enforcement officers can only see their assigned cases
+        resolved_assigned = assigned_to
+        if user.role == UserRole.ENFORCEMENT_OFFICER:
+            resolved_assigned = _officer_name(user.full_name)
+
         cases = service.list_cases(
             session,
             status=status,
             zone_type=zone_type,
             severity=severity,
-            assigned_to=assigned_to,
+            assigned_to=resolved_assigned,
             limit=limit,
             offset=offset,
         )
@@ -193,6 +214,7 @@ def list_cases(
             status=status,
             zone_type=zone_type,
             severity=severity,
+            assigned_to=resolved_assigned,
         )
     return CaseListResponse(
         total=total,
@@ -262,10 +284,32 @@ def create_case(
 def get_stats(
     user=Depends(_require_auth),
 ):
-    """Return aggregate statistics about cases (counts by status, severity, zone)."""
+    """Return aggregate statistics about cases (counts by status, severity, zone).
+
+    Enforcement officers only see stats for their assigned cases.
+    """
     with _get_session() as session:
         service = CaseService()
-        stats = service.get_case_stats(session)
+        if user.role == UserRole.ENFORCEMENT_OFFICER:
+            # Officers see stats only for their assigned cases
+            stats = {
+                "total": 0,
+                "by_status": {s: 0 for s in CaseStatus.CHOICES},
+                "by_severity": {s: 0 for s in ["low", "medium", "high", "critical"]},
+                "by_zone": {z: 0 for z in ["residential", "commercial", "heritage",
+                                            "green_belt", "riverfront", "industrial", "other"]},
+            }
+            my_cases = service.list_cases(session, assigned_to=_officer_name(user.full_name), limit=999)
+            for c in my_cases:
+                stats["total"] += 1
+                if c.status in stats["by_status"]:
+                    stats["by_status"][c.status] += 1
+                if c.severity in stats["by_severity"]:
+                    stats["by_severity"][c.severity] += 1
+                if c.zone_type in stats["by_zone"]:
+                    stats["by_zone"][c.zone_type] += 1
+        else:
+            stats = service.get_case_stats(session)
     return CaseStatsResponse(**stats)
 
 
@@ -274,12 +318,21 @@ def get_case(
     case_id: int,
     user=Depends(_require_auth),
 ):
-    """Get full details for a single case, including evidence and notices."""
+    """Get full details for a single case, including evidence and notices.
+
+    Enforcement officers can only view cases assigned to them.
+    """
     with _get_session() as session:
         service = CaseService()
         case = service.get_case(session, case_id)
         if case is None:
             raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+        # Enforcement officers can only view their assigned cases
+        if user.role == UserRole.ENFORCEMENT_OFFICER and case.assigned_to != _officer_name(user.full_name):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only view cases assigned to you",
+            )
         base = _case_to_response(case)
         evidence = [_evidence_to_response(e) for e in case.evidence]
         return CaseDetailResponse(**base.model_dump(), evidence=evidence)
@@ -293,16 +346,33 @@ def get_case(
 def update_status(
     case_id: int,
     body: StatusUpdateRequest,
-    user=Depends(_require_auth),
+    user=Depends(_require_role(UserRole.ENFORCEMENT_OFFICER, UserRole.SUPERVISOR, UserRole.ADMIN)),
 ):
-    """Update the workflow status of a case (e.g. detected → assigned → field_verified)."""
+    """Update the workflow status of a case (e.g. detected → assigned → field_verified).
+
+    Enforcement officers can update their own assigned cases. Admins and
+    supervisors can update any case.
+    """
     with _get_session() as session:
         service = CaseService()
+        case = service.get_case(session, case_id)
+        if case is None:
+            raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+        # Officers can only update their assigned cases
+        if user.role == UserRole.ENFORCEMENT_OFFICER and case.assigned_to != _officer_name(user.full_name):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only update cases assigned to you",
+            )
+        # Officers cannot escalate or resolve — those require a supervisor
+        if user.role == UserRole.ENFORCEMENT_OFFICER and body.status in ("escalated", "resolved"):
+            raise HTTPException(
+                status_code=403,
+                detail="Only supervisors or admins can escalate or resolve cases",
+            )
         case = service.update_status(
             session, case_id, body.status, notes=body.notes,
         )
-        if case is None:
-            raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
         return _case_to_response(case)
 
 
@@ -336,7 +406,7 @@ async def add_evidence(
     evidence_type: str = Query("field_photo", description="Type of evidence"),
     description: Optional[str] = Query(None, description="Optional description"),
     uploaded_by: Optional[str] = Query(None, description="Uploader name"),
-    user=Depends(_require_auth),
+    user=Depends(_require_role(UserRole.ENFORCEMENT_OFFICER, UserRole.SUPERVISOR, UserRole.ADMIN)),
 ):
     """Upload an evidence file (photo, document, etc.) and attach it to a case.
 
@@ -422,7 +492,7 @@ def get_evidence_image(case_id: int, evidence_id: int):
 )
 def get_notice(
     case_id: int,
-    user=Depends(_require_auth),
+    user=Depends(_require_role(UserRole.ENFORCEMENT_OFFICER, UserRole.SUPERVISOR, UserRole.ADMIN)),
 ):
     """Generate an enforcement notice PDF for a case and download it.
 

@@ -845,17 +845,19 @@ body {
       <div id="tab-info" class="tab-content" style="display:none">
         <div class="detail-grid" id="detail-grid"></div>
         <div class="modal-actions" id="modal-actions">
-          <select class="status-select" id="status-select">
-            <option value="detected">Detected</option>
-            <option value="assigned">Assigned</option>
-            <option value="field_verified">Field Verified</option>
-            <option value="enforcement_ready">Enforcement Ready</option>
-            <option value="notice_issued">Notice Issued</option>
-            <option value="resolved">Resolved</option>
-            <option value="escalated">Escalated</option>
-          </select>
-          <button class="btn btn-secondary btn-sm" onclick="updateStatus()">Update Status</button>
-          <button class="btn btn-primary btn-sm" onclick="downloadNotice()">Download Notice</button>
+          <div id="modal-officer-actions" style="display:none;gap:8px;flex-wrap:wrap;">
+            <select class="status-select" id="status-select">
+              <option value="detected">Detected</option>
+              <option value="assigned">Assigned</option>
+              <option value="field_verified">Field Verified</option>
+              <option value="enforcement_ready">Enforcement Ready</option>
+              <option value="notice_issued">Notice Issued</option>
+              <option value="resolved">Resolved</option>
+              <option value="escalated">Escalated</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="updateStatus()" id="btn-update-status">Update Status</button>
+            <button class="btn btn-primary btn-sm" onclick="downloadNotice()" id="btn-download-notice">Download Notice</button>
+          </div>
           <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
         </div>
       </div>
@@ -920,6 +922,10 @@ let lightboxImages=[];
 let lightboxIndex=0;
 let _modalCase=null;
 let searchQuery='';
+function officerName(fullName){
+  const idx=fullName.indexOf(' —');
+  return idx>=0?fullName.slice(0,idx).trim():fullName.trim();
+}
 
 // ================================================================
 // i18n
@@ -997,6 +1003,16 @@ function showDashboard(){
   document.getElementById('user-name-display').textContent=user?.full_name||'—';
   document.getElementById('user-role-display').textContent=(user?.role||'').replace('_',' ')||'—';
   applyTranslations();
+  // Hide admin-level UI for enforcement officers
+  applyRoleBasedUI();
+}
+
+function applyRoleBasedUI(){
+  const role=user?.role||'';
+  const isOfficer=role==='enforcement_officer';
+  // Hide bulk notice button from officers
+  document.getElementById('btn-bulk-notice').style.display=isOfficer?'none':'';
+  // For officers, we don't show the section initially; it's shown per-case in openCaseModal
 }
 
 // ================================================================
@@ -1168,15 +1184,23 @@ async function loadCases(){
   const listEl=document.getElementById('case-list');
   listEl.innerHTML='<div class="loading"><div class="spinner"></div> '+__('common.loading')+'</div>';
   try{
-    let url='/cases?limit=200';
-    if(activeFilter==='critical')url+='&severity=critical';
-    else if(activeFilter==='heritage')url+='&zone_type=heritage';
-    else if(activeFilter==='resolved')url+='&status=resolved';
-    else if(activeFilter!=='all')url+='&status='+activeFilter;
-    const data=await api(url);
+    // Always fetch full list so filter tab counts are accurate
+    const data=await api('/cases?limit=200');
     allCases=data.cases||[];
-    filteredCases=allCases;
-    document.getElementById('case-count').textContent=allCases.length;
+    // Apply filter client-side
+    if(activeFilter==='all'){
+      filteredCases=allCases;
+    } else if(activeFilter==='critical'){
+      filteredCases=allCases.filter(c=>c.severity==='critical');
+    } else if(activeFilter==='heritage'){
+      filteredCases=allCases.filter(c=>c.zone_type==='heritage');
+    } else if(activeFilter==='resolved'){
+      filteredCases=allCases.filter(c=>c.status==='resolved');
+    } else {
+      filteredCases=allCases.filter(c=>c.status===activeFilter);
+    }
+    document.getElementById('case-count').textContent=filteredCases.length;
+    // Always render counts from the full dataset so tab numbers stay accurate
     renderFilterCounts(allCases);
     applySearchFilter();
     updateMapMarkers(filteredCases);
@@ -1216,21 +1240,34 @@ function setFilter(filter,btn){
 function applySearchFilter(){
   const listEl=document.getElementById('case-list');
   const q=searchQuery.toLowerCase().trim();
-  filteredCases=q?allCases.filter(c=>
+  
+  // No search — show filteredCases as-is from loadCases() (don't mutate)
+  if(!q){
+    if(!filteredCases.length){
+      listEl.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><p>No cases match your search.</p></div>';
+      return;
+    }
+    listEl.innerHTML='';
+    filteredCases.forEach(c=>listEl.appendChild(createCaseItem(c)));
+    return;
+  }
+  
+  // Search narrows the display but does NOT overwrite filteredCases
+  const display=filteredCases.filter(c=>
     (c.case_number||'').toLowerCase().includes(q)||
     (c.violation_class||'').toLowerCase().includes(q)||
     (c.zone_type||'').toLowerCase().includes(q)||
     (c.status||'').toLowerCase().includes(q)||
     (c.assigned_to||'').toLowerCase().includes(q)||
     (c.description||'').toLowerCase().includes(q)
-  ):allCases;
-
-  if(!filteredCases.length){
+  );
+  
+  if(!display.length){
     listEl.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><p>No cases match your search.</p></div>';
     return;
   }
   listEl.innerHTML='';
-  filteredCases.forEach(c=>listEl.appendChild(createCaseItem(c)));
+  display.forEach(c=>listEl.appendChild(createCaseItem(c)));
 }
 
 function filterCasesBySearch(val){
@@ -1268,12 +1305,12 @@ function createCaseItem(c){
       <span class="case-status-label">${statusLabel}</span>
     </div>
   `;
-  // Inline quick-assign action
+  // Inline quick-assign action — embedded in the case-progress row to avoid overlap
   if(!c.assigned_to&&c.status==='detected'){
     const assignBtn=document.createElement('button');
     assignBtn.className='btn btn-ghost btn-xs';
     assignBtn.textContent='👤 Assign';
-    assignBtn.style.cssText='position:absolute;right:16px;bottom:10px;';
+    assignBtn.style.marginLeft='auto';  // push to the right inside flex row
     assignBtn.onclick=async(e)=>{
       e.stopPropagation();
       const name=prompt('Assign to officer:','Enforcement Officer');
@@ -1283,7 +1320,9 @@ function createCaseItem(c){
         showToast('Assigned to '+name,'success');loadCases();loadStats();
       }catch(err){showToast('Failed: '+err.message,'error');}
     };
-    div.appendChild(assignBtn);
+    // Insert into the progress row instead of appending at the bottom
+    const progressRow=div.querySelector('.case-progress');
+    if(progressRow)progressRow.appendChild(assignBtn);
   }
   return div;
 }
@@ -1400,6 +1439,28 @@ async function openCaseModal(caseId){
     // Status select
     const ss=document.getElementById('status-select');
     if(ss)ss.value=c.status||'detected';
+    
+    // Role-based: hide status/notice actions for officers on non-assigned cases
+    const actions=document.getElementById('modal-officer-actions');
+    if(actions){
+      const role=user?.role||'';
+      if(role==='enforcement_officer' && c.assigned_to!==officerName(user?.full_name||'')){
+        actions.style.display='none';
+      } else if(role==='enforcement_officer'){
+        // Officers can update but not escalate/resolve — hide those options
+        const sel=document.getElementById('status-select');
+        if(sel){
+          for(const opt of sel.options){
+            if(opt.value==='escalated'||opt.value==='resolved'){
+              opt.style.display='none';
+            }
+          }
+        }
+        actions.style.display='flex';
+      } else {
+        actions.style.display='flex';
+      }
+    }
     
     // Show Info tab by default
     switchModalTab('info',document.querySelector('.modal-tab'));
