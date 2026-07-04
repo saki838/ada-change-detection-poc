@@ -1,9 +1,10 @@
 """
 Orchestrator — wires Stage 0 through Stage 5 together exactly as specified
-in Section 3 of the POC doc:
+in Section 3 of the POC doc, plus Stage 4.5 (Permit Reconciliation):
 
     Stage 0 Align -> Stage 1 Change detection -> Stage 2 Region extraction
-    -> Stage 3 Segment + classify -> Stage 4 Measurement -> Stage 5 Report
+    -> Stage 3 Segment + classify -> Stage 4 Measurement
+    -> Stage 4.5 Permit Reconciliation -> Stage 5 Report
 
 Usage:
     python -m src.pipeline --t1 T1.tif --t2 T2.tif --parcel parcel.geojson \
@@ -13,14 +14,20 @@ from __future__ import annotations
 
 import argparse
 import copy
+import pathlib
 
 import yaml
+from sqlalchemy.orm import Session
 
+from src.database.connection import get_engine
+from src.database.models import init_db, PipelineRun
 from src.stage0_align import align_rasters
 from src.stage1_change_detection import detect_change
 from src.stage2_region_extraction import extract_regions
 from src.stage3_segment_classify import segment_and_classify
 from src.stage4_measurement import measure_violations
+from src.stage4_5_permit_reconciliation import reconcile_violations
+from src.services.case_service import CaseService
 from src.stage5_report import write_report
 
 
@@ -45,6 +52,9 @@ def run_pipeline(
     out_dir: str,
     cfg: dict,
     red_zone_path: str | None = None,
+    db_path: str | None = None,
+    zone_type: str | None = None,
+    enable_cases: bool = True,
 ) -> dict:
     print("[Stage 0] Aligning T1/T2 rasters...")
     aligned = align_rasters(
@@ -80,6 +90,23 @@ def run_pipeline(
     )
     print(f"  -> {len(violations)} measured violations")
 
+    # Stage 4.5 — Permit Reconciliation (requires database)
+    reconciled = None
+    if enable_cases and db_path and violations:
+        init_db(db_path)
+        from sqlalchemy.orm import Session
+        from src.database.connection import get_engine
+
+        print("[Stage 4.5] Running permit reconciliation...")
+        engine = get_engine(db_path)
+        with Session(engine) as session:
+            reconciled = reconcile_violations(
+                violations=violations,
+                db_session=session,
+                crs=aligned.crs,
+            )
+        print(f"  -> {len(reconciled)} violations reconciled")
+
     print("[Stage 5] Writing report...")
     paths = write_report(
         violations,
@@ -90,8 +117,32 @@ def run_pipeline(
         overlay_alpha=cfg["stage5_report"]["overlay_alpha"],
         overlay_mask_color=tuple(cfg["stage5_report"]["overlay_mask_color"]),
     )
-    print(f"  -> {paths}")
-    return paths
+    print(f"  -> Report files: {paths}")
+
+    # Create cases from reconciled violations
+    created_cases = []
+    if enable_cases and db_path and reconciled:
+        print("[Case Service] Creating cases from violations...")
+        engine = get_engine(db_path)
+        with Session(engine) as session:
+            case_service = CaseService()
+            created_cases = case_service.create_cases_from_violations(
+                session=session,
+                run_id=pathlib.Path(out_dir).name,
+                reconciled_violations=reconciled,
+                zone_type=zone_type,
+            )
+        print(f"  -> {len(created_cases)} cases created")
+        for c in created_cases:
+            print(f"     {c.case_number}: {c.severity.upper()} - {c.description[:80]}...")
+
+    return {
+        **paths,
+        "violation_count": len(violations),
+        "reconciled_count": len(reconciled) if reconciled else 0,
+        "case_count": len(created_cases),
+        "cases": [c.case_number for c in created_cases],
+    }
 
 
 def main():
@@ -107,6 +158,18 @@ def main():
         help="Use no-weights stand-in models everywhere (smoke test / no GPU)",
     )
     parser.add_argument("--weights", default=None, help="Override stage1 weights_path")
+    parser.add_argument(
+        "--db-path", default=None,
+        help="Database path for permit reconciliation + case persistence (default: skip)",
+    )
+    parser.add_argument(
+        "--zone-type", default=None,
+        help="Zone type for all violations (e.g. heritage, residential). Auto-detected if omitted.",
+    )
+    parser.add_argument(
+        "--no-cases", action="store_true",
+        help="Skip case creation even if --db-path is provided",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -115,7 +178,13 @@ def main():
     if args.weights:
         cfg["stage1_change_detection"]["weights_path"] = args.weights
 
-    run_pipeline(args.t1, args.t2, args.parcel, args.out, cfg, red_zone_path=args.red_zone)
+    run_pipeline(
+        args.t1, args.t2, args.parcel, args.out, cfg,
+        red_zone_path=args.red_zone,
+        db_path=args.db_path,
+        zone_type=args.zone_type,
+        enable_cases=not args.no_cases,
+    )
 
 
 if __name__ == "__main__":

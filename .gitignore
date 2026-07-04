@@ -12,6 +12,11 @@ data/levir_cd/**/*.png
 data/levir_cd/**/*.tif
 data/site/*.tif
 data/site/_synthetic_demo/
+
+# database — seed data, regenerate on deploy
+data/ada.db
+data/ada.db-shm
+data/ada.db-wal
 outputs/*/
 external/
 
@@ -19,4 +24,8 @@ external/
 !data/levir_cd/**/.gitkeep
 !data/site/.gitkeep
 !outputs/.gitkeep
+
+# temp scripts created by AI assistant
+_check_weights.py
+_cleanup_cache.py
 data/site/_levir_sample_test/

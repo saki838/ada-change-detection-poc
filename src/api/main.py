@@ -28,8 +28,13 @@ from typing import Optional
 
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from src.api.auth import router as auth_router
+from src.api.cases import router as cases_router
+from src.api.i18n import router as i18n_router
+from src.api.notifications import router as notifications_router
 from src.pipeline import load_config, force_dummy_mode, run_pipeline
 
 app = FastAPI(
@@ -187,3 +192,24 @@ def _read_summary(csv_path: pathlib.Path) -> list[ViolationSummary]:
         return []
     df = df.where(pd.notnull(df), None)
     return [ViolationSummary(**row) for row in df.to_dict(orient="records")]
+
+
+# Mount the Web-GIS dashboard as static files
+DASHBOARD_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "dashboard"
+if DASHBOARD_DIR.exists():
+    app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
+
+# Redirect root to the dashboard
+from fastapi.responses import RedirectResponse
+
+
+@app.get("/", include_in_schema=False, tags=["meta"], summary="Redirect to dashboard")
+def root():
+    return RedirectResponse(url="/dashboard/index.html")
+
+
+# Register sub-routers
+app.include_router(auth_router)
+app.include_router(cases_router)
+app.include_router(i18n_router)
+app.include_router(notifications_router)

@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADA Enforcement Dashboard — Agra Development Authority</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<link rel="manifest" href="/dashboard/manifest.json">
+<meta name="theme-color" content="#1A2744">
+<style>
+/* ===================================================
+   DESIGN SYSTEM — Agra Sandstone & Royal Indigo
+   =================================================== */
+:root {
+  --sandstone:       #C75B26;
+  --sandstone-dark:  #A3451A;
+  --sandstone-light: #E07B45;
+  --indigo:          #1A2744;
+  --indigo-light:    #2A3D66;
+  --indigo-dark:     #111B30;
+  --cream:           #F7F3EC;
+  --cream-dark:      #EDE5D8;
+  --white:           #FFFFFF;
+  --text:            #1F1F1F;
+  --text-secondary:  #6B7280;
+  --text-muted:      #9CA3AF;
+  --border:          #E5E7EB;
+  --border-light:    #F3F4F6;
+  --green:           #059669;
+  --green-light:     #D1FAE5;
+  --amber:           #D97706;
+  --amber-light:     #FEF3C7;
+  --orange:          #EA580C;
+  --orange-light:    #FFF7ED;
+  --red:             #DC2626;
+  --red-light:       #FEE2E2;
+  --blue:            #2563EB;
+  --blue-light:      #DBEAFE;
+  --purple:          #7C3AED;
+  --purple-light:    #EDE9FE;
+  --shadow-sm:       0 1px 3px rgba(26,39,68,0.08);
+  --shadow:          0 2px 8px rgba(26,39,68,0.10);
+  --shadow-lg:       0 8px 32px rgba(26,39,68,0.14);
+  --shadow-xl:       0 16px 48px rgba(26,39,68,0.18);
+  --radius-sm:       6px;
+  --radius:          10px;
+  --radius-lg:       16px;
+  --transition:      200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  min-height: 100vh;
+  overflow: hidden;
+}
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--text-muted); }
+
+/* ===================================================
+   LOGIN PAGE — Dark Theme
+   =================================================== */
+#login-page {
+  display:flex; min-height:100vh; align-items:center; justify-content:center;
+  background:
+    radial-gradient(ellipse 120% 80% at 20% 10%, rgba(199,91,38,0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 100% 60% at 80% 90%, rgba(199,91,38,0.06) 0%, transparent 50%),
+    linear-gradient(160deg, #0F172A 0%, var(--indigo-dark) 30%, var(--indigo) 55%, var(--indigo-light) 100%);
+  position:relative; overflow:hidden;
+}
+/* Grid overlay */
+#login-page::before {
+  content:''; position:absolute; inset:0;
+  background-image:
+    linear-gradient(90deg, rgba(199,91,38,0.04) 1px, transparent 1px),
+    linear-gradient(rgba(199,91,38,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 70%);
+}
+/* Glowing orb top-right */
+#login-page::after {
+  content:''; position:absolute; width:500px; height:500px; border-radius:50%;
+  background: radial-gradient(circle, rgba(199,91,38,0.10) 0%, rgba(199,91,38,0.04) 40%, transparent 70%);
+  top:-180px; right:-120px;
+  animation: orbFloat 8s ease-in-out infinite;
+}
+@keyframes orbFloat {
+  0%,100% { transform:translateY(0) scale(1); }
+  50% { transform:translateY(20px) scale(1.05); }
+}
+/* Subtle bottom-right accent */
+#login-page .bg-accent {
+  position:absolute; bottom:-80px; left:-80px; width:350px; height:350px; border-radius:50%;
+  background: radial-gradient(circle, rgba(199,91,38,0.06) 0%, transparent 60%);
+  pointer-events:none;
+}
+
+.login-card {
+  background: linear-gradient(145deg, rgba(26,39,68,0.92) 0%, rgba(17,27,48,0.96) 100%);
+  border-radius:var(--radius-lg); padding:44px 40px;
+  width:100%; max-width:420px;
+  box-shadow:
+    0 0 0 1px rgba(199,91,38,0.12),
+    0 20px 60px rgba(0,0,0,0.4),
+    0 0 80px rgba(199,91,38,0.04);
+  position:relative; z-index:1;
+  animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter:blur(12px);
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(24px) scale(0.97); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+/* Top accent line */
+.login-card::before {
+  content:''; position:absolute; top:0; left:40px; right:40px; height:3px;
+  background: linear-gradient(90deg, transparent, var(--sandstone), transparent);
+  border-radius:0 0 2px 2px;
+}
+
+.login-card .logo-wrap {
+  display:flex; align-items:center; gap:12px; margin-bottom:20px;
+}
+.login-card .logo-mark {
+  width:42px; height:42px; background:var(--sandstone); border-radius:11px;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--white); font-weight:800; font-size:18px;
+  box-shadow:0 2px 8px rgba(199,91,38,0.3);
+}
+.login-card h1 {
+  color:var(--white); font-size:22px; font-weight:700; letter-spacing:-0.5px;
+}
+.login-card .subtitle {
+  color:rgba(255,255,255,0.5); font-size:13px; margin-bottom:28px;
+  line-height:1.5; font-weight:400;
+}
+.login-card .subtitle .highlight {
+  color:var(--sandstone-light); font-weight:500;
+}
+.form-group { margin-bottom:18px; }
+.form-group label {
+  display:block; font-size:11px; font-weight:600; color:rgba(255,255,255,0.7);
+  margin-bottom:6px; letter-spacing:0.5px; text-transform:uppercase;
+}
+.form-group input {
+  width:100%; padding:12px 14px;
+  border:1.5px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm);
+  font-size:15px; color:var(--white); background:rgba(255,255,255,0.04);
+  outline:none; transition:all var(--transition);
+}
+.form-group input::placeholder {
+  color:rgba(255,255,255,0.25);
+}
+.form-group input:focus {
+  border-color:var(--sandstone);
+  background:rgba(199,91,38,0.06);
+  box-shadow:0 0 0 3px rgba(199,91,38,0.10);
+}
+/* Input icon indicators */
+.form-group .input-wrap {
+  position:relative;
+}
+.form-group .input-wrap .input-icon {
+  position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  color:rgba(255,255,255,0.2); font-size:16px; pointer-events:none;
+  transition:color var(--transition);
+}
+.form-group .input-wrap:focus-within .input-icon {
+  color:var(--sandstone-light);
+}
+.form-group .input-wrap input {
+  padding-left:36px;
+}
+
+.login-error {
+  display:none; background:rgba(220,38,38,0.12); color:var(--red);
+  border:1px solid rgba(220,38,38,0.2); font-size:13px;
+  padding:10px 14px; border-radius:var(--radius-sm); margin-bottom:16px;
+}
+
+/* Login button specific */
+#login-btn {
+  padding:13px 20px; font-size:15px; margin-top:4px;
+  letter-spacing:0.3px;
+}
+#login-btn:disabled {
+  opacity:0.6;
+}
+
+/* Footer text on login */
+.login-footer {
+  text-align:center; margin-top:20px;
+  font-size:11px; color:rgba(255,255,255,0.2);
+}
+.login-footer a {
+  color:rgba(199,91,38,0.5); text-decoration:none;
+  transition:color var(--transition);
+}
+.login-footer a:hover {
+  color:var(--sandstone-light);
+}
+
+/* ===================================================
+   BUTTONS
+   =================================================== */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 20px; border-radius:var(--radius-sm); font-size:14px; font-weight:600;
+  border:none; cursor:pointer; transition:all var(--transition); white-space:nowrap;
+  text-decoration:none; line-height:1.2;
+}
+.btn-primary { background:var(--sandstone); color:var(--white); }
+.btn-primary:hover { background:var(--sandstone-dark); transform:translateY(-1px); box-shadow:0 4px 12px rgba(199,91,38,0.3); }
+.btn-secondary { background:var(--indigo); color:var(--white); }
+.btn-secondary:hover { background:var(--indigo-light); }
+.btn-ghost { background:transparent; color:var(--text-secondary); border:1px solid var(--border); }
+.btn-ghost:hover { background:var(--cream); border-color:var(--sandstone-light); color:var(--sandstone); }
+.btn-sm { padding:6px 12px; font-size:12px; }
+.btn-xs { padding:4px 8px; font-size:11px; border-radius:4px; }
+.btn-icon { width:32px; height:32px; padding:0; justify-content:center; border-radius:var(--radius-sm); }
+.btn-full { width:100%; }
+.btn:disabled { opacity:0.5; cursor:not-allowed; transform:none !important; }
+
+/* ===================================================
+   MAIN DASHBOARD LAYOUT
+   =================================================== */
+#dashboard-page { display:none; height:100vh; flex-direction:column; overflow:hidden; }
+
+/* --- HEADER --- */
+.dash-header {
+  background:var(--indigo-dark); padding:0 20px; height:52px;
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+  box-shadow:0 1px 3px rgba(0,0,0,0.15); position:relative; z-index:10;
+}
+.dash-header .brand { display:flex; align-items:center; gap:10px; }
+.dash-header .brand .logo-mark {
+  width:30px; height:30px; background:var(--sandstone); border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--white); font-weight:800; font-size:14px;
+}
+.dash-header .brand h2 { font-size:16px; color:var(--white); font-weight:600; letter-spacing:-0.3px; }
+.dash-header .brand .badge {
+  font-size:9px; padding:2px 8px; background:rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.6); border-radius:4px; font-weight:500;
+  text-transform:uppercase; letter-spacing:0.5px;
+}
+.dash-header .user-info { display:flex; align-items:center; gap:8px; }
+.dash-header .user-info .user-name { font-size:13px; color:rgba(255,255,255,0.85); font-weight:500; }
+.dash-header .user-info .user-role {
+  font-size:10px; padding:2px 8px; background:rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.55); border-radius:4px; font-weight:500;
+}
+.toggle-analytics {
+  background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12);
+  cursor:pointer; padding:5px 10px; border-radius:var(--radius-sm);
+  font-size:12px; color:rgba(255,255,255,0.75); transition:all var(--transition);
+}
+.toggle-analytics:hover { background:rgba(255,255,255,0.14); color:var(--white); }
+.btn-logout {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  cursor:pointer; padding:5px 10px; border-radius:var(--radius-sm);
+  font-size:12px; color:rgba(255,255,255,0.6); transition:all var(--transition);
+}
+.btn-logout:hover { border-color:var(--red); color:var(--red); background:rgba(220,38,38,0.12); }
+.lang-switcher { display:flex; gap:0; }
+.lang-btn {
+  padding:3px 8px; font-size:10px; font-weight:700; border:1px solid rgba(255,255,255,0.15);
+  background:transparent; color:rgba(255,255,255,0.5); cursor:pointer;
+  transition:all var(--transition); text-transform:uppercase; letter-spacing:0.5px;
+}
+.lang-btn:first-child { border-radius:4px 0 0 4px; }
+.lang-btn:last-child { border-radius:0 4px 4px 0; }
+.lang-btn.active { background:var(--sandstone); color:var(--white); border-color:var(--sandstone); }
+.lang-btn:hover:not(.active) { border-color:var(--sandstone-light); color:rgba(255,255,255,0.8); }
+.offline-badge {
+  display:none; font-size:9px; padding:2px 7px; background:rgba(234,88,12,0.2);
+  color:#F97316; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px;
+}
+.offline-badge.show { display:inline-block; }
+
+/* --- STATS BAR --- */
+.stats-bar {
+  display:flex; gap:10px; padding:12px 20px; background:var(--white);
+  border-bottom:1px solid var(--border); flex-shrink:0; overflow-x:auto;
+}
+.stat-card {
+  flex:1; min-width:130px; padding:12px 16px; border-radius:var(--radius);
+  background:var(--cream); border:1px solid var(--border-light);
+  display:flex; flex-direction:column; gap:2px; position:relative; overflow:hidden;
+}
+.stat-card .stat-header { display:flex; align-items:center; justify-content:space-between; }
+.stat-card .stat-label { font-size:10px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; }
+.stat-card .stat-icon { font-size:14px; opacity:0.6; }
+.stat-card .stat-value { font-size:26px; font-weight:700; color:var(--indigo); line-height:1.1; }
+.stat-card .stat-bar { height:3px; border-radius:2px; margin-top:6px; background:var(--border); overflow:hidden; }
+.stat-card .stat-bar-fill { height:100%; border-radius:2px; transition:width 0.6s ease-out; }
+.stat-card.stat-critical .stat-value { color:var(--red); }
+.stat-card.stat-critical .stat-bar-fill { background:var(--red); }
+.stat-card.stat-high .stat-value { color:var(--orange); }
+.stat-card.stat-high .stat-bar-fill { background:var(--orange); }
+.stat-card.stat-total .stat-value { color:var(--sandstone); }
+.stat-card.stat-total .stat-bar-fill { background:var(--sandstone); }
+.stat-card.stat-open .stat-value { color:var(--indigo); }
+.stat-card.stat-open .stat-bar-fill { background:var(--indigo); }
+.stat-card .stat-trend { font-size:10px; font-weight:600; display:inline-flex; align-items:center; gap:2px; }
+.stat-trend.up { color:var(--green); }
+.stat-trend.down { color:var(--red); }
+
+/* --- MAIN CONTENT --- */
+.dash-content { display:flex; flex:1; overflow:hidden; }
+
+/* ===================================================
+   MAP PANEL
+   =================================================== */
+.map-panel { flex:1; position:relative; min-width:0; }
+#map { width:100%; height:100%; }
+.map-controls {
+  position:absolute; top:12px; left:12px; z-index:1000;
+  display:flex; gap:6px; flex-wrap:wrap;
+}
+.map-control-btn {
+  background:var(--white); border:none; padding:6px 12px; border-radius:6px;
+  font-size:11px; font-weight:600; color:var(--text-secondary); cursor:pointer;
+  box-shadow:var(--shadow); transition:all var(--transition); display:flex; align-items:center; gap:4px;
+}
+.map-control-btn:hover { background:var(--cream); color:var(--text); }
+.map-control-btn.active { background:var(--indigo); color:var(--white); }
+.map-legend {
+  position:absolute; bottom:20px; left:20px; z-index:1000;
+  background:var(--white); padding:10px 14px; border-radius:var(--radius);
+  box-shadow:var(--shadow); font-size:11px; border:1px solid var(--border);
+  display:flex; flex-direction:column; gap:3px;
+}
+.map-legend .legend-row { display:flex; align-items:center; gap:6px; }
+.map-legend .legend-dot { width:8px; height:8px; border-radius:50%; border:1.5px solid rgba(0,0,0,0.1); }
+.map-legend .legend-dot.critical { background:var(--red); }
+.map-legend .legend-dot.high { background:var(--orange); }
+.map-legend .legend-dot.medium { background:var(--amber); }
+.map-legend .legend-dot.low { background:var(--green); }
+.map-legend .legend-label { color:var(--text-secondary); }
+.map-search-box {
+  position:absolute; top:12px; right:12px; z-index:1000;
+  background:var(--white); border-radius:8px; box-shadow:var(--shadow);
+  padding:6px 12px; display:flex; align-items:center; gap:6px;
+  border:1px solid var(--border); max-width:200px;
+}
+.map-search-box input {
+  border:none; outline:none; font-size:12px; color:var(--text); width:100%;
+  background:transparent;
+}
+.map-search-box input::placeholder { color:var(--text-muted); }
+.map-search-box .search-icon { color:var(--text-muted); font-size:12px; }
+
+/* --- Heatmap Legend (visible only in heat mode) --- */
+.heat-legend {
+  display:none; position:absolute; bottom:20px; right:20px; z-index:1000;
+  background:var(--white); padding:12px 14px; border-radius:var(--radius);
+  box-shadow:var(--shadow-lg); font-size:11px; border:1px solid var(--border);
+  min-width:160px; animation: fadeUp 0.3s ease-out;
+}
+.heat-legend.open { display:flex; flex-direction:column; gap:6px; }
+.heat-legend-header {
+  font-size:11px; font-weight:700; color:var(--indigo);
+  display:flex; align-items:center; gap:4px;
+}
+.heat-legend-bar {
+  display:flex; flex-direction:column; gap:2px;
+}
+.heat-legend-gradient {
+  height:16px; border-radius:4px;
+  background: linear-gradient(90deg, #059669 0%, #D97706 33%, #EA580C 66%, #DC2626 100%);
+  border:1px solid var(--border);
+}
+.heat-legend-labels {
+  display:flex; justify-content:space-between; font-size:9px;
+  color:var(--text-muted); font-weight:600; letter-spacing:0.2px;
+}
+
+/* ===================================================
+   CASE PANEL
+   =================================================== */
+.case-panel {
+  width:440px; background:var(--white); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; flex-shrink:0;
+}
+.case-panel-header {
+  padding:12px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.case-panel-header .header-left { display:flex; align-items:center; gap:10px; min-width:0; }
+.case-panel-header .header-left h3 { font-size:14px; color:var(--indigo); font-weight:600; white-space:nowrap; }
+.case-panel-header .case-count {
+  font-size:11px; font-weight:600; color:var(--text-secondary);
+  background:var(--cream); padding:2px 9px; border-radius:10px; white-space:nowrap;
+}
+.case-search {
+  padding:8px 16px; border-bottom:1px solid var(--border-light);
+  display:flex; gap:6px;
+}
+.case-search input {
+  flex:1; padding:7px 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm);
+  font-size:12px; outline:none; background:var(--cream);
+  transition:border-color var(--transition);
+}
+.case-search input:focus { border-color:var(--sandstone); background:var(--white); }
+.case-search input::placeholder { color:var(--text-muted); }
+.case-filters {
+  padding:8px 16px; border-bottom:1px solid var(--border-light);
+  display:flex; gap:4px; flex-wrap:wrap; overflow-x:auto;
+}
+.filter-btn {
+  padding:4px 10px; border:1px solid var(--border); border-radius:14px;
+  background:var(--white); font-size:11px; color:var(--text-secondary);
+  cursor:pointer; transition:all var(--transition); white-space:nowrap; font-weight:500;
+  display:flex; align-items:center; gap:4px;
+}
+.filter-btn .count { font-size:9px; opacity:0.6; font-weight:600; }
+.filter-btn:hover { border-color:var(--sandstone-light); color:var(--sandstone); }
+.filter-btn.active { background:var(--sandstone); color:var(--white); border-color:var(--sandstone); }
+.filter-btn.active .count { opacity:0.8; }
+
+.case-list { flex:1; overflow-y:auto; padding:4px 0; }
+.case-item {
+  padding:10px 16px; border-bottom:1px solid var(--border-light);
+  cursor:pointer; transition:background var(--transition); position:relative;
+  display:flex; flex-direction:column; gap:5px;
+}
+.case-item:hover { background:var(--cream); }
+.case-item:active { background:var(--cream-dark); }
+.case-item .case-top { display:flex; justify-content:space-between; align-items:center; }
+.case-item .case-number { font-size:13px; font-weight:600; color:var(--indigo); }
+.case-item .severity-badge {
+  font-size:9px; font-weight:700; padding:2px 7px; border-radius:4px;
+  text-transform:uppercase; letter-spacing:0.3px;
+}
+.severity-badge.critical { background:var(--red-light); color:var(--red); }
+.severity-badge.high { background:var(--orange-light); color:var(--orange); }
+.severity-badge.medium { background:var(--amber-light); color:var(--amber); }
+.severity-badge.low { background:var(--green-light); color:var(--green); }
+.case-item .case-meta {
+  font-size:11px; color:var(--text-secondary); display:flex; gap:10px; flex-wrap:wrap;
+}
+.case-item .case-meta span { display:flex; align-items:center; gap:3px; }
+.case-item .case-progress {
+  display:flex; align-items:center; gap:8px; margin-top:2px;
+}
+.case-item .progress-track {
+  flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden;
+}
+.case-item .progress-fill {
+  height:100%; border-radius:2px; transition:width 0.4s ease;
+}
+.case-item .case-status-label {
+  font-size:9px; font-weight:600; color:var(--text-muted);
+  text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap;
+}
+.status-dot { width:7px; height:7px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.status-dot.detected { background:#9CA3AF; }
+.status-dot.assigned { background:var(--indigo); }
+.status-dot.field_verified { background:var(--amber); }
+.status-dot.enforcement_ready { background:var(--orange); }
+.status-dot.notice_issued { background:var(--sandstone); }
+.status-dot.resolved { background:var(--green); }
+.status-dot.escalated { background:var(--red); }
+
+/* ===================================================
+   ANALYTICS SECTION
+   =================================================== */
+.analytics-section {
+  display:none; background:var(--cream); border-bottom:1px solid var(--border);
+  padding:12px 20px; flex-shrink:0; overflow-x:auto;
+}
+.analytics-section.open { display:block; }
+.analytics-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.chart-card {
+  background:var(--white); border-radius:var(--radius); padding:12px;
+  border:1px solid var(--border-light);
+}
+.chart-card h4 { font-size:11px; font-weight:600; color:var(--indigo); margin-bottom:8px; }
+
+/* ===================================================
+   MODAL
+   =================================================== */
+.modal-overlay {
+  display:none; position:fixed; inset:0; background:rgba(26,39,68,0.5); z-index:2000;
+  align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);
+}
+.modal-overlay.open { display:flex; }
+.modal {
+  background:var(--white); border-radius:var(--radius-lg); width:100%; max-width:750px;
+  max-height:88vh; overflow:hidden; box-shadow:var(--shadow-xl);
+  animation:modalIn 0.25s ease-out; display:flex; flex-direction:column;
+}
+@keyframes modalIn {
+  from { opacity:0; transform:scale(0.96) translateY(12px); }
+  to { opacity:1; transform:scale(1) translateY(0); }
+}
+.modal-header {
+  padding:16px 24px; border-bottom:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center; flex-shrink:0;
+}
+.modal-header .modal-title { display:flex; align-items:center; gap:10px; }
+.modal-header .modal-title h2 { font-size:18px; color:var(--indigo); font-weight:700; }
+.modal-close {
+  background:none; border:none; width:30px; height:30px; border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; color:var(--text-muted); cursor:pointer; transition:all var(--transition);
+}
+.modal-close:hover { background:var(--cream); color:var(--text); }
+
+/* Modal Tabs */
+.modal-tabs {
+  display:flex; border-bottom:1px solid var(--border); background:var(--cream);
+  padding:0 24px; flex-shrink:0; overflow-x:auto;
+}
+.modal-tab {
+  padding:10px 16px; font-size:12px; font-weight:600; color:var(--text-muted);
+  background:none; border:none; cursor:pointer; transition:all var(--transition);
+  border-bottom:2px solid transparent; white-space:nowrap;
+  display:flex; align-items:center; gap:5px;
+}
+.modal-tab:hover { color:var(--text); }
+.modal-tab.active { color:var(--sandstone); border-bottom-color:var(--sandstone); }
+
+.modal-body { flex:1; overflow-y:auto; padding:20px 24px 24px; }
+.modal-loading { display:flex; align-items:center; justify-content:center; padding:60px; color:var(--text-muted); gap:10px; }
+.modal-error { display:none; }
+
+/* Info Tab */
+.detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.detail-field {
+  padding:10px 12px; background:var(--cream); border-radius:var(--radius-sm);
+  border:1px solid var(--border-light);
+}
+.detail-field .field-label {
+  font-size:10px; font-weight:600; color:var(--text-muted);
+  text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px;
+}
+.detail-field .field-value { font-size:14px; font-weight:500; color:var(--text); }
+.detail-field.full-width { grid-column:1 / -1; }
+
+/* Timeline Tab */
+.timeline { position:relative; padding-left:24px; }
+.timeline::before {
+  content:''; position:absolute; left:7px; top:4px; bottom:4px;
+  width:2px; background:var(--border); border-radius:1px;
+}
+.timeline-item { position:relative; margin-bottom:16px; }
+.timeline-item:last-child { margin-bottom:0; }
+.timeline-item .timeline-dot {
+  position:absolute; left:-20px; top:3px; width:14px; height:14px;
+  border-radius:50%; border:2px solid var(--border); background:var(--white);
+  display:flex; align-items:center; justify-content:center;
+  font-size:7px;
+}
+.timeline-item.completed .timeline-dot { border-color:var(--green); background:var(--green-light); }
+.timeline-item.active .timeline-dot { border-color:var(--sandstone); background:var(--cream); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(199,91,38,0.3); } 50% { box-shadow:0 0 0 6px rgba(199,91,38,0); } }
+.timeline-item .timeline-time { font-size:10px; color:var(--text-muted); margin-bottom:2px; }
+.timeline-item .timeline-title { font-size:13px; font-weight:600; color:var(--text); }
+.timeline-item .timeline-desc { font-size:11px; color:var(--text-secondary); margin-top:1px; }
+
+/* Evidence Tab */
+.evidence-gallery { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.evidence-card {
+  background:var(--cream); border-radius:var(--radius-sm); border:1px solid var(--border-light);
+  overflow:hidden; cursor:pointer; transition:all var(--transition);
+}
+.evidence-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+.evidence-card .ev-img-wrap {
+  position:relative; background:var(--indigo-dark); text-align:center; height:140px;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.evidence-card .ev-img-wrap img {
+  max-width:100%; max-height:100%; object-fit:contain;
+  transition:transform 0.3s ease;
+}
+.evidence-card:hover .ev-img-wrap img { transform:scale(1.05); }
+.evidence-card .ev-info { padding:8px 10px; }
+.evidence-card .ev-type { font-size:10px; font-weight:600; color:var(--indigo); }
+.evidence-card .ev-desc { font-size:9px; color:var(--text-muted); margin-top:1px; }
+
+/* Lightbox */
+.lightbox {
+  display:none; position:fixed; inset:0; z-index:4000;
+  background:rgba(0,0,0,0.92); align-items:center; justify-content:center;
+  backdrop-filter:blur(8px);
+}
+.lightbox.open { display:flex; }
+.lightbox img { max-width:90vw; max-height:85vh; border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+.lightbox .lb-close {
+  position:absolute; top:20px; right:20px; width:40px; height:40px;
+  background:rgba(255,255,255,0.1); border:none; border-radius:50%;
+  color:white; font-size:24px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:background var(--transition);
+}
+.lightbox .lb-close:hover { background:rgba(255,255,255,0.2); }
+.lightbox .lb-info {
+  position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
+  color:rgba(255,255,255,0.6); font-size:13px; text-align:center;
+}
+.lightbox .lb-prev, .lightbox .lb-next {
+  position:absolute; top:50%; transform:translateY(-50%);
+  width:44px; height:44px; background:rgba(255,255,255,0.08); border:none; border-radius:50%;
+  color:white; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:background var(--transition);
+}
+.lightbox .lb-prev:hover, .lightbox .lb-next:hover { background:rgba(255,255,255,0.18); }
+.lightbox .lb-prev { left:20px; }
+.lightbox .lb-next { right:20px; }
+
+/* Notice Tab */
+.notice-preview {
+  padding:20px; background:var(--cream); border-radius:var(--radius);
+  border:1px solid var(--border); text-align:center;
+}
+.notice-preview .notice-icon { font-size:40px; margin-bottom:12px; }
+.notice-preview h4 { font-size:15px; color:var(--indigo); margin-bottom:6px; }
+.notice-preview p { font-size:12px; color:var(--text-secondary); margin-bottom:16px; }
+
+/* Modal Actions */
+.modal-actions {
+  display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;
+  padding-top:16px; border-top:1px solid var(--border);
+}
+.status-select {
+  padding:7px 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm);
+  font-size:13px; background:var(--white); color:var(--text);
+  cursor:pointer; outline:none; transition:border-color var(--transition);
+}
+.status-select:focus { border-color:var(--sandstone); }
+
+/* ===================================================
+   LOADING & EMPTY STATES
+   =================================================== */
+.loading { display:flex; align-items:center; justify-content:center; padding:48px; color:var(--text-muted); gap:10px; }
+.spinner { width:18px; height:18px; border:2.5px solid var(--border); border-top-color:var(--sandstone); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.empty-state { text-align:center; padding:48px 24px; color:var(--text-secondary); }
+.empty-state .empty-icon { font-size:36px; margin-bottom:8px; opacity:0.3; }
+.empty-state p { font-size:13px; }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:24px; right:24px; z-index:3000;
+  padding:12px 20px; border-radius:var(--radius); font-size:13px; font-weight:500;
+  box-shadow:var(--shadow-lg); display:none;
+  animation:toastIn 0.3s ease-out;
+}
+@keyframes toastIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+.toast.success { background:var(--green); color:var(--white); }
+.toast.error { background:var(--red); color:var(--white); }
+.toast.info { background:var(--indigo); color:var(--white); }
+
+/* ===================================================
+   RESPONSIVE
+   =================================================== */
+@media (max-width:1024px) {
+  .case-panel { width:380px; }
+  .analytics-grid { grid-template-columns:1fr 1fr; }
+  .evidence-gallery { grid-template-columns:1fr 1fr; }
+}
+@media (max-width:768px) {
+  .dash-content { flex-direction:column; }
+  .case-panel { width:100%; max-height:45vh; border-left:none; border-top:1px solid var(--border); }
+  .stats-bar { gap:6px; padding:10px 12px; overflow-x:auto; }
+  .stat-card { min-width:100px; padding:10px 12px; }
+  .stat-card .stat-value { font-size:22px; }
+  .dash-header { padding:0 12px; height:48px; }
+  .dash-header .brand .badge { display:none; }
+  .dash-header .user-info .user-name { display:none; }
+  .modal { max-width:100%; max-height:92vh; border-radius:var(--radius) var(--radius) 0 0; margin-top:auto; }
+  .modal-overlay { align-items:flex-end; padding:0; }
+  .detail-grid { grid-template-columns:1fr; }
+  .evidence-gallery { grid-template-columns:1fr; }
+  .analytics-grid { grid-template-columns:1fr; }
+  .map-search-box { display:none; }
+  .map-controls { top:8px; left:8px; }
+  .map-controls .map-control-btn { padding:4px 8px; font-size:10px; }
+}
+@media (max-width:480px) {
+  .stat-card { min-width:80px; padding:8px 10px; }
+  .stat-card .stat-value { font-size:18px; }
+  .login-card { padding:28px 20px; margin:12px; }
+  .dash-header .user-info .user-role { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="toast"></div>
+
+<!-- ===== LOGIN PAGE ===== -->
+<div id="login-page">
+  <div class="login-card">
+    <div class="bg-accent"></div>
+    <div class="logo-wrap">
+      <div class="logo-mark">ADA</div>
+      <h1 data-i18n="login.title">ADA Enforcement</h1>
+    </div>
+    <p class="subtitle" data-i18n="login.subtitle"><span class="highlight">Agra Development Authority</span> — Violation Management System</p>
+    <div id="login-error" class="login-error"></div>
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="email" data-i18n="login.email">Email</label>
+        <div class="input-wrap">
+          <span class="input-icon">✉</span>
+          <input type="email" id="email" data-i18n-placeholder="login.email_placeholder" placeholder="Enter your email" required autocomplete="email">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="password" data-i18n="login.password">Password</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔑</span>
+          <input type="password" id="password" data-i18n-placeholder="login.password_placeholder" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" id="login-btn" data-i18n="login.sign_in">Sign In</button>
+    </form>
+    <div class="login-footer">ADA Enforcement System v2.0</div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="dashboard-page">
+  <!-- Header -->
+  <header class="dash-header">
+    <div class="brand">
+      <div class="logo-mark">ADA</div>
+      <h2 data-i18n="dashboard.title">Enforcement Dashboard</h2>
+      <span class="badge" data-i18n="dashboard.badge">Agra Development Authority</span>
+    </div>
+    <div class="user-info">
+      <span class="offline-badge" id="offline-badge">Offline</span>
+      <div class="lang-switcher">
+        <button class="lang-btn active" onclick="setLanguage('en')" id="lang-en">EN</button>
+        <button class="lang-btn" onclick="setLanguage('hi')" id="lang-hi">HI</button>
+      </div>
+      <span class="user-name" id="user-name-display">—</span>
+      <span class="user-role" id="user-role-display">—</span>
+      <button class="toggle-analytics" onclick="toggleAnalytics()" id="btn-analytics">📊 Analytics</button>
+      <button class="btn-logout" onclick="logout()" id="btn-logout" data-i18n="dashboard.sign_out">Sign Out</button>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar" id="stats-bar"></div>
+
+  <!-- Analytics Section -->
+  <div class="analytics-section" id="analytics-section">
+    <div class="analytics-grid">
+      <div class="chart-card"><h4 data-i18n="analytics.severity">Cases by Severity</h4><canvas id="chart-severity" height="160"></canvas></div>
+      <div class="chart-card"><h4 data-i18n="analytics.zone">Cases by Zone</h4><canvas id="chart-zone" height="160"></canvas></div>
+      <div class="chart-card"><h4 data-i18n="analytics.status">Cases by Status</h4><canvas id="chart-status" height="160"></canvas></div>
+      <div class="chart-card"><h4 data-i18n="analytics.trend">Weekly Trend</h4><canvas id="chart-trend" height="160"></canvas></div>
+    </div>
+  </div>
+
+  <div class="dash-content">
+    <!-- Map -->
+    <div class="map-panel">
+      <div id="map"></div>
+      <div class="map-controls" id="map-controls">
+        <button class="map-control-btn active" onclick="toggleMapLayer('all', this)">📍 All</button>
+        <button class="map-control-btn" onclick="toggleMapLayer('critical', this)">🔴 Critical</button>
+        <button class="map-control-btn" onclick="toggleMapLayer('heat', this)" id="btn-heat">🔥 Heat</button>
+      </div>
+      <div class="map-legend" id="map-legend">
+        <div class="legend-row"><span class="legend-dot critical"></span><span class="legend-label" data-i18n="legend.critical">Critical</span></div>
+        <div class="legend-row"><span class="legend-dot high"></span><span class="legend-label" data-i18n="legend.high">High</span></div>
+        <div class="legend-row"><span class="legend-dot medium"></span><span class="legend-label" data-i18n="legend.medium">Medium</span></div>
+        <div class="legend-row"><span class="legend-dot low"></span><span class="legend-label" data-i18n="legend.low">Low</span></div>
+      </div>
+      <!-- Heatmap Legend (shown when heat mode is active) -->
+      <div class="heat-legend" id="heat-legend">
+        <div class="heat-legend-header">🔥 Violation Density</div>
+        <div class="heat-legend-bar">
+          <div class="heat-legend-gradient"></div>
+          <div class="heat-legend-labels">
+            <span>Low</span>
+            <span>Medium</span>
+            <span>High</span>
+            <span>Critical</span>
+          </div>
+        </div>
+      </div>
+      <div class="map-search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="map-search" placeholder="Search cases..." oninput="filterCasesBySearch(this.value)">
+      </div>
+    </div>
+
+    <!-- Case Panel -->
+    <div class="case-panel">
+      <div class="case-panel-header">
+        <div class="header-left">
+          <h3 data-i18n="cases.title">Violation Cases</h3>
+          <span class="case-count" id="case-count">0</span>
+        </div>
+        <button class="btn btn-ghost btn-xs" id="btn-bulk-notice" onclick="bulkGenerateNotices()" title="Generate PDFs for visible cases">📄 Bulk</button>
+      </div>
+      <div class="case-search">
+        <input type="text" id="case-search-input" placeholder="Search cases by number, type, zone..." oninput="filterCasesBySearch(this.value)">
+      </div>
+      <div class="case-filters" id="case-filters"></div>
+      <div class="case-list" id="case-list">
+        <div class="loading"><div class="spinner"></div> Loading cases...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CASE DETAIL MODAL ===== -->
+<div id="case-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h2 id="modal-case-number">—</h2>
+        <span class="severity-badge" id="modal-severity-badge">—</span>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-tabs" id="modal-tabs" style="display:none">
+      <button class="modal-tab active" onclick="switchModalTab('info',this)">📋 Info</button>
+      <button class="modal-tab" onclick="switchModalTab('evidence',this)">📸 Evidence</button>
+      <button class="modal-tab" onclick="switchModalTab('timeline',this)">📅 Timeline</button>
+      <button class="modal-tab" onclick="switchModalTab('notice',this)">📄 Notice</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="modal-loading" id="modal-loading"><div class="spinner"></div> Loading...</div>
+      <div id="modal-error" class="modal-error"></div>
+
+      <!-- Info Tab -->
+      <div id="tab-info" class="tab-content" style="display:none">
+        <div class="detail-grid" id="detail-grid"></div>
+        <div class="modal-actions" id="modal-actions">
+          <select class="status-select" id="status-select">
+            <option value="detected">Detected</option>
+            <option value="assigned">Assigned</option>
+            <option value="field_verified">Field Verified</option>
+            <option value="enforcement_ready">Enforcement Ready</option>
+            <option value="notice_issued">Notice Issued</option>
+            <option value="resolved">Resolved</option>
+            <option value="escalated">Escalated</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="updateStatus()">Update Status</button>
+          <button class="btn btn-primary btn-sm" onclick="downloadNotice()">Download Notice</button>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+
+      <!-- Evidence Tab -->
+      <div id="tab-evidence" class="tab-content" style="display:none">
+        <p id="evidence-hint" style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Click an image to view full-size.</p>
+        <div class="evidence-gallery" id="evidence-gallery"></div>
+        <div class="empty-state" id="evidence-empty" style="display:none"><p style="color:var(--text-muted)">No evidence images for this case.</p></div>
+      </div>
+
+      <!-- Timeline Tab -->
+      <div id="tab-timeline" class="tab-content" style="display:none">
+        <div class="timeline" id="timeline-container">
+          <p style="color:var(--text-muted);font-size:13px;">Loading timeline...</p>
+        </div>
+      </div>
+
+      <!-- Notice Tab -->
+      <div id="tab-notice" class="tab-content" style="display:none">
+        <div class="notice-preview">
+          <div class="notice-icon">📄</div>
+          <h4>Enforcement Notice</h4>
+          <p>Generate a formal enforcement notice PDF for this case.</p>
+          <button class="btn btn-primary" onclick="downloadNotice()">📥 Download Notice PDF</button>
+          <button class="btn btn-ghost btn-sm" onclick="bulkGenerateNotices()" style="margin-top:8px;">📦 Generate for all visible cases</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LIGHTBOX ===== -->
+<div id="lightbox" class="lightbox" onclick="closeLightbox(event)">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <button class="lb-prev" id="lb-prev" onclick="navigateLightbox(-1)">‹</button>
+  <img id="lightbox-img" src="" alt="Evidence image">
+  <button class="lb-next" id="lb-next" onclick="navigateLightbox(1)">›</button>
+  <div class="lb-info" id="lb-info"></div>
+</div>
+
+<script>
+// ================================================================
+// STATE
+// ================================================================
+const API_BASE='/api/v1';
+let token=localStorage.getItem('ada_token');
+let user=null;
+let map=null;
+let markers=[];
+let markerCluster=null;
+let heatLayer=null;
+let activeFilter='all';
+let currentCaseId=null;
+let currentLang=localStorage.getItem('ada_lang')||'en';
+let translations={};
+let charts={severity:null,zone:null,status:null,trend:null};
+let analyticsOpen=false;
+let allCases=[];
+let filteredCases=[];
+let lightboxImages=[];
+let lightboxIndex=0;
+let _modalCase=null;
+let searchQuery='';
+
+// ================================================================
+// i18n
+// ================================================================
+async function loadTranslations(lang){
+  try{const d=await api('/i18n/translations?lang='+lang);translations=d.translations||{};}
+  catch(e){translations={};}
+}
+function __(key){return translations[key]||key;}
+function applyTranslations(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k=el.getAttribute('data-i18n');if(k)el.textContent=__(k);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
+    const k=el.getAttribute('data-i18n-placeholder');if(k)el.placeholder=__(k);
+  });
+}
+function setLanguage(lang){
+  currentLang=lang;localStorage.setItem('ada_lang',lang);
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('lang-'+lang);if(btn)btn.classList.add('active');
+  loadTranslations(lang).then(()=>{
+    applyTranslations();
+    if(document.getElementById('dashboard-page').style.display!=='none')loadDashboard();
+  });
+}
+
+// ================================================================
+// API
+// ================================================================
+async function api(path,opts={}){
+  const h={'Content-Type':'application/json',...opts.headers};
+  if(token)h['Authorization']='Bearer '+token;
+  const res=await fetch(API_BASE+path,{...opts,headers:h});
+  if(res.status===401){logout();throw new Error('Session expired');}
+  if(!res.ok){
+    const err=await res.json().catch(()=>({detail:res.statusText}));
+    throw new Error(err.detail||'Request failed');
+  }
+  return res.json();
+}
+function showToast(msg,type='info'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast '+type;t.style.display='block';
+  setTimeout(()=>{t.style.display='none';},3500);
+}
+
+// ================================================================
+// AUTH
+// ================================================================
+async function handleLogin(e){
+  e.preventDefault();
+  const email=document.getElementById('email').value;
+  const password=document.getElementById('password').value;
+  const btn=document.getElementById('login-btn');
+  const errDiv=document.getElementById('login-error');
+  btn.disabled=true;btn.textContent=__('common.signing_in');errDiv.style.display='none';
+  try{
+    const data=await api('/auth/login',{method:'POST',body:JSON.stringify({email,password})});
+    token=data.access_token;user=data.user;
+    localStorage.setItem('ada_token',token);localStorage.setItem('ada_user',JSON.stringify(user));
+    showDashboard();loadDashboard();showToast('Welcome, '+user.full_name,'success');
+  }catch(err){errDiv.textContent=err.message;errDiv.style.display='block';}
+  finally{btn.disabled=false;btn.textContent=__('login.sign_in');}
+}
+function logout(){
+  token=null;user=null;localStorage.removeItem('ada_token');localStorage.removeItem('ada_user');
+  document.getElementById('login-page').style.display='flex';
+  document.getElementById('dashboard-page').style.display='none';
+  if(map){map.remove();map=null;}
+}
+function showDashboard(){
+  document.getElementById('login-page').style.display='none';
+  document.getElementById('dashboard-page').style.display='flex';
+  document.getElementById('user-name-display').textContent=user?.full_name||'—';
+  document.getElementById('user-role-display').textContent=(user?.role||'').replace('_',' ')||'—';
+  applyTranslations();
+}
+
+// ================================================================
+// STATS BAR
+// ================================================================
+function renderStatsBar(stats){
+  const bar=document.getElementById('stats-bar');
+  const total=stats.total||0;
+  const open=(stats.by_status?.detected||0)+(stats.by_status?.assigned||0)+(stats.by_status?.field_verified||0)+(stats.by_status?.enforcement_ready||0)+(stats.by_status?.escalated||0);
+  const critical=stats.by_severity?.critical||0;
+  const high=stats.by_severity?.high||0;
+  const resolved=stats.by_status?.resolved||0;
+  const maxVal=Math.max(total,1);
+  bar.innerHTML=`
+    <div class="stat-card stat-total">
+      <div class="stat-header"><span class="stat-label">Total</span><span class="stat-icon">📋</span></div>
+      <div class="stat-value">${total}</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:${(total/maxVal)*100}%"></div></div>
+    </div>
+    <div class="stat-card stat-open">
+      <div class="stat-header"><span class="stat-label">Open</span><span class="stat-icon">🟡</span></div>
+      <div class="stat-value">${open}</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:${(open/maxVal)*100}%"></div></div>
+    </div>
+    <div class="stat-card stat-critical">
+      <div class="stat-header"><span class="stat-label">Critical</span><span class="stat-icon">🔴</span></div>
+      <div class="stat-value">${critical}</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:${(critical/Math.max(critical,1))*100}%"></div></div>
+    </div>
+    <div class="stat-card stat-high">
+      <div class="stat-header"><span class="stat-label">High</span><span class="stat-icon">🟠</span></div>
+      <div class="stat-value">${high}</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:${(high/Math.max(high,1))*100}%"></div></div>
+    </div>
+    <div class="stat-card stat-total">
+      <div class="stat-header"><span class="stat-label">Resolved</span><span class="stat-icon">✅</span></div>
+      <div class="stat-value">${resolved}</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:${(resolved/Math.max(total,1))*100}%;background:var(--green)"></div></div>
+    </div>
+  `;
+}
+
+// ================================================================
+// MAP
+// ================================================================
+function initMap(){
+  if(map)return;
+  map=L.map('map',{center:[27.1767,78.0081],zoom:12,zoomControl:true});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'&copy; OpenStreetMap',maxZoom:19,
+  }).addTo(map);
+  markerCluster=L.markerClusterGroup({
+    maxClusterRadius:50,
+    spiderfyOnMaxZoom:true,
+    showCoverageOnHover:false,
+    iconCreateFunction:function(cluster){
+      const count=cluster.getChildCount();
+      let color='#C75B26';
+      if(count>5)color='#DC2626';
+      else if(count>2)color='#EA580C';
+      return L.divIcon({
+        html:`<div style="background:${color};color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.2);">${count}</div>`,
+        className:'',iconSize:[36,36],
+      });
+    }
+  });
+  map.addLayer(markerCluster);
+  // Expose for console debugging
+  window._map=map;window._markerCluster=markerCluster;
+  setTimeout(()=>map.invalidateSize(),200);
+}
+
+function updateMapMarkers(cases){
+  markerCluster.clearLayers();markers=[];
+  // Build heatmap points from case coordinates
+  const heatPoints=[];
+  const bounds=[];
+  cases.forEach(c=>{
+    if(!c.location_geojson)return;
+    try{
+      const geom=JSON.parse(c.location_geojson);let lat,lng;
+      if(geom.type==='Point'){lng=geom.coordinates[0];lat=geom.coordinates[1];}
+      else if(geom.type==='Polygon'){
+        const ct=geom.coordinates[0].reduce((a,c)=>[a[0]+c[0],a[1]+c[1]],[0,0]);
+        lng=ct[0]/geom.coordinates[0].length;lat=ct[1]/geom.coordinates[0].length;
+      }else return;
+      const color=c.severity==='critical'?'#DC2626':c.severity==='high'?'#EA580C':c.severity==='medium'?'#D97706':'#059669';
+      const marker=L.circleMarker([lat,lng],{
+        radius:9,fillColor:color,color:'#fff',weight:2,opacity:1,fillOpacity:0.8,
+      });
+      
+      const statusLabel=(c.status||'').replace(/_/g,' ');
+      const violationLabel=(c.violation_class||'').replace(/_/g,' ');
+      
+      marker._caseId=c.id;
+      
+      marker.bindPopup(`
+        <div style="font-family:-apple-system,sans-serif;min-width:180px;">
+          <div style="font-weight:700;font-size:14px;color:#1A2744;">${c.case_number}</div>
+          <div style="font-size:12px;color:#6B7280;margin:2px 0;">${violationLabel}</div>
+          <div style="display:flex;gap:8px;font-size:11px;color:#6B7280;margin:4px 0;">
+            <span style="color:${color};font-weight:600;">${c.severity}</span>
+            <span>${c.area_m2?.toFixed(1)} m²</span>
+          </div>
+          <div style="font-size:10px;color:#9CA3AF;">${statusLabel}</div>
+          <button onclick="openCaseModal(${c.id})" 
+            style="margin-top:6px;padding:4px 10px;background:#C75B26;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;width:100%;">
+            View Details →
+          </button>
+        </div>
+      `);
+      marker.on('click',()=>openCaseModal(c.id));
+      markers.push(marker);markerCluster.addLayer(marker);bounds.push([lat,lng]);
+      // Add heat point with severity-based intensity
+      const intensity=c.severity==='critical'?1.0:c.severity==='high'?0.8:c.severity==='medium'?0.5:0.3;
+      heatPoints.push([lat,lng,intensity]);
+    }catch(e){}
+  });
+  // Build heat layer
+  if(heatLayer){map.removeLayer(heatLayer);}
+  heatLayer=L.heatLayer(heatPoints,{
+    radius:30,blur:20,maxZoom:15,max:1.0,gradient:{0.3:'#059669',0.5:'#D97706',0.7:'#EA580C',0.9:'#DC2626'},
+  });
+  // Show heat layer and legend only if it was active before
+  if(mapLayerMode==='heat'){
+    map.addLayer(heatLayer);
+    markerCluster.clearLayers();
+    document.getElementById('heat-legend')?.classList.add('open');
+    document.getElementById('map-legend')?.classList.add('heat-active');
+  }
+  if(bounds.length>0)map.fitBounds(bounds,{padding:[40,40]});
+  window._markers=markers;
+}
+
+let mapLayerMode='all';
+function toggleMapLayer(mode,btn){
+  document.querySelectorAll('.map-control-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  mapLayerMode=mode;
+  if(mode==='heat'){
+    map.addLayer(heatLayer);
+    markerCluster.clearLayers();
+    document.getElementById('heat-legend')?.classList.add('open');
+    document.getElementById('map-legend')?.classList.add('heat-active');
+    showToast('Heat map: violation density overlay activated','info');
+  } else {
+    if(heatLayer)map.removeLayer(heatLayer);
+    document.getElementById('heat-legend')?.classList.remove('open');
+    document.getElementById('map-legend')?.classList.remove('heat-active');
+    if(mode==='critical'){
+      // Show only critical markers
+      markerCluster.clearLayers();
+      markers.forEach(m=>{
+        const c=allCases.find(x=>x.id===m._caseId);
+        if(c&&c.severity==='critical')markerCluster.addLayer(m);
+      });
+    } else {
+      // Show all markers
+      markerCluster.clearLayers();
+      markers.forEach(m=>markerCluster.addLayer(m));
+    }
+  }
+}
+
+// ================================================================
+// CASE LIST
+// ================================================================
+async function loadCases(){
+  const listEl=document.getElementById('case-list');
+  listEl.innerHTML='<div class="loading"><div class="spinner"></div> '+__('common.loading')+'</div>';
+  try{
+    let url='/cases?limit=200';
+    if(activeFilter==='critical')url+='&severity=critical';
+    else if(activeFilter==='heritage')url+='&zone_type=heritage';
+    else if(activeFilter==='resolved')url+='&status=resolved';
+    else if(activeFilter!=='all')url+='&status='+activeFilter;
+    const data=await api(url);
+    allCases=data.cases||[];
+    filteredCases=allCases;
+    document.getElementById('case-count').textContent=allCases.length;
+    renderFilterCounts(allCases);
+    applySearchFilter();
+    updateMapMarkers(filteredCases);
+  }catch(err){
+    listEl.innerHTML='<div class="empty-state"><p>'+__('common.load_error')+': '+err.message+'</p></div>';
+  }
+}
+
+function renderFilterCounts(cases){
+  const counts={all:cases.length};
+  cases.forEach(c=>{
+    counts[c.status]=(counts[c.status]||0)+1;
+    if(c.severity==='critical')counts.critical=(counts.critical||0)+1;
+    if(c.zone_type==='heritage')counts.heritage=(counts.heritage||0)+1;
+    if(c.status==='resolved')counts.resolved=(counts.resolved||0)+1;
+  });
+  const filters=document.getElementById('case-filters');
+  const items=[
+    {key:'all',label:'All',icon:'📋'},{key:'detected',label:'Detected',icon:'📡'},
+    {key:'assigned',label:'Assigned',icon:'👤'},{key:'critical',label:'Critical',icon:'🔴'},
+    {key:'heritage',label:'Heritage',icon:'🏛️'},{key:'resolved',label:'Resolved',icon:'✅'},
+  ];
+  filters.innerHTML=items.map(f=>
+    `<button class="filter-btn ${activeFilter===f.key?'active':''}" onclick="setFilter('${f.key}',this)">
+      ${f.icon} ${f.label} <span class="count">${counts[f.key]||0}</span>
+    </button>`
+  ).join('');
+}
+
+function setFilter(filter,btn){
+  activeFilter=filter;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  loadCases();
+}
+
+function applySearchFilter(){
+  const listEl=document.getElementById('case-list');
+  const q=searchQuery.toLowerCase().trim();
+  filteredCases=q?allCases.filter(c=>
+    (c.case_number||'').toLowerCase().includes(q)||
+    (c.violation_class||'').toLowerCase().includes(q)||
+    (c.zone_type||'').toLowerCase().includes(q)||
+    (c.status||'').toLowerCase().includes(q)||
+    (c.assigned_to||'').toLowerCase().includes(q)||
+    (c.description||'').toLowerCase().includes(q)
+  ):allCases;
+
+  if(!filteredCases.length){
+    listEl.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><p>No cases match your search.</p></div>';
+    return;
+  }
+  listEl.innerHTML='';
+  filteredCases.forEach(c=>listEl.appendChild(createCaseItem(c)));
+}
+
+function filterCasesBySearch(val){
+  searchQuery=val;
+  applySearchFilter();
+}
+
+function createCaseItem(c){
+  const div=document.createElement('div');div.className='case-item';
+  div.onclick=()=>openCaseModal(c.id);
+  const sevLabel=c.severity||'unknown';
+  const statusLabel=(c.status||'').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase());
+  const violationLabel=(c.violation_class||'').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase());
+  
+  // Progress based on status
+  const statusOrder=['detected','assigned','field_verified','enforcement_ready','notice_issued','resolved','escalated'];
+  const progressIdx=statusOrder.indexOf(c.status||'detected');
+  const progress=progressIdx>=0?Math.max(Math.round((progressIdx/(statusOrder.length-1))*100),5):10;
+  const progressColor=progress>=100?'#059669':progress>=60?'#D97706':'#C75B26';
+  
+  div.innerHTML=`
+    <div class="case-top">
+      <span class="case-number">${c.case_number}</span>
+      <span class="severity-badge ${sevLabel}">${sevLabel}</span>
+    </div>
+    <div class="case-meta">
+      <span>📌 ${violationLabel}</span>
+      <span>📐 ${c.area_m2?.toFixed(1)||'—'} m²</span>
+      <span>📍 ${(c.zone_type||'—').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</span>
+      ${c.assigned_to?`<span>👤 ${c.assigned_to}</span>`:''}
+    </div>
+    <div class="case-progress">
+      <span class="status-dot ${c.status}"></span>
+      <div class="progress-track"><div class="progress-fill" style="width:${progress}%;background:${progressColor}"></div></div>
+      <span class="case-status-label">${statusLabel}</span>
+    </div>
+  `;
+  // Inline quick-assign action
+  if(!c.assigned_to&&c.status==='detected'){
+    const assignBtn=document.createElement('button');
+    assignBtn.className='btn btn-ghost btn-xs';
+    assignBtn.textContent='👤 Assign';
+    assignBtn.style.cssText='position:absolute;right:16px;bottom:10px;';
+    assignBtn.onclick=async(e)=>{
+      e.stopPropagation();
+      const name=prompt('Assign to officer:','Enforcement Officer');
+      if(!name)return;
+      try{
+        await api('/cases/'+c.id+'/assign',{method:'POST',body:JSON.stringify({officer_name:name})});
+        showToast('Assigned to '+name,'success');loadCases();loadStats();
+      }catch(err){showToast('Failed: '+err.message,'error');}
+    };
+    div.appendChild(assignBtn);
+  }
+  return div;
+}
+
+// ================================================================
+// STATS & ANALYTICS
+// ================================================================
+async function loadStats(){
+  try{
+    const stats=await api('/cases/stats');
+    renderStatsBar(stats);
+  }catch(err){console.error('Stats error:',err);}
+}
+function toggleAnalytics(){
+  analyticsOpen=!analyticsOpen;
+  const s=document.getElementById('analytics-section');
+  s.classList.toggle('open',analyticsOpen);
+  document.getElementById('btn-analytics').textContent=analyticsOpen?'📊 Close':'📊 Analytics';
+  if(analyticsOpen)renderCharts();
+  setTimeout(()=>map?.invalidateSize(),300);
+}
+async function renderCharts(){
+  try{
+    const stats=await api('/cases/stats');
+    renderSeverityChart(stats.by_severity||{});
+    renderZoneChart(stats.by_zone||{});
+    renderStatusChart(stats.by_status||{});
+    renderTrendChart();
+  }catch(e){console.error(e);}
+}
+function renderSeverityChart(d){
+  const ctx=document.getElementById('chart-severity')?.getContext('2d');
+  if(!ctx)return;if(charts.severity)charts.severity.destroy();
+  charts.severity=new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:['Low','Medium','High','Critical'],datasets:[{data:[d.low||0,d.medium||0,d.high||0,d.critical||0],backgroundColor:['#059669','#D97706','#EA580C','#DC2626'],borderWidth:0}]},
+    options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}}}
+  });
+}
+function renderZoneChart(d){
+  const ctx=document.getElementById('chart-zone')?.getContext('2d');
+  if(!ctx)return;if(charts.zone)charts.zone.destroy();
+  const labels={residential:'Residential',commercial:'Commercial',heritage:'Heritage',green_belt:'Green Belt',riverfront:'Riverfront',industrial:'Industrial',other:'Other'};
+  const colors=['#059669','#2563EB','#DC2626','#059669','#0891B2','#6B7280','#D97706'];
+  const entries=Object.entries(d).filter(([_,v])=>v>0);
+  charts.zone=new Chart(ctx,{
+    type:'bar',
+    data:{labels:entries.map(([k])=>labels[k]||k),datasets:[{label:'Cases',data:entries.map(([_,v])=>v),backgroundColor:entries.map((_,i)=>colors[i%colors.length]),borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}}}}}
+  });
+}
+function renderStatusChart(d){
+  const ctx=document.getElementById('chart-status')?.getContext('2d');
+  if(!ctx)return;if(charts.status)charts.status.destroy();
+  const labels={detected:'Detected',assigned:'Assigned',field_verified:'Field Verified',enforcement_ready:'Enforcement Ready',notice_issued:'Notice Issued',resolved:'Resolved',escalated:'Escalated'};
+  const colors=['#9CA3AF','#1A2744','#D97706','#EA580C','#C75B26','#059669','#DC2626'];
+  const entries=Object.entries(d).filter(([_,v])=>v>0);
+  charts.status=new Chart(ctx,{
+    type:'bar',
+    data:{labels:entries.map(([k])=>labels[k]||k),datasets:[{label:'Cases',data:entries.map(([_,v])=>v),backgroundColor:entries.map((_,i)=>colors[i%colors.length]),borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}}}}}
+  });
+}
+function renderTrendChart(){
+  const ctx=document.getElementById('chart-trend')?.getContext('2d');
+  if(!ctx)return;if(charts.trend)charts.trend.destroy();
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  charts.trend=new Chart(ctx,{
+    type:'line',
+    data:{labels:days,datasets:[{label:'Detected',data:days.map(()=>Math.floor(Math.random()*5)),borderColor:'#C75B26',backgroundColor:'rgba(199,91,38,0.08)',fill:true,tension:0.4,pointBackgroundColor:'#C75B26',pointRadius:3}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}}}}}
+  });
+}
+
+// ================================================================
+// DASHBOARD INIT
+// ================================================================
+async function loadDashboard(){
+  initMap();
+  await Promise.all([loadStats(),loadCases()]);
+}
+
+// ================================================================
+// MODAL
+// ================================================================
+async function openCaseModal(caseId){
+  currentCaseId=caseId;
+  document.getElementById('case-modal').classList.add('open');
+  document.getElementById('modal-loading').style.display='flex';
+  document.getElementById('modal-error').style.display='none';
+  document.getElementById('modal-tabs').style.display='none';
+  document.getElementById('tab-info').style.display='none';
+  document.getElementById('tab-evidence').style.display='none';
+  document.getElementById('tab-timeline').style.display='none';
+  document.getElementById('tab-notice').style.display='none';
+  document.querySelectorAll('.modal-tab').forEach(t=>t.classList.remove('active'));
+  
+  try{
+    const c=await api('/cases/'+caseId);
+    document.getElementById('modal-loading').style.display='none';
+    document.getElementById('modal-tabs').style.display='flex';
+    document.querySelector('.modal-tab').classList.add('active');
+    
+    // Header
+    const badge=document.getElementById('modal-severity-badge');
+    document.getElementById('modal-case-number').textContent=c.case_number;
+    if(badge){badge.textContent=c.severity||'—';badge.className='severity-badge '+(c.severity||'');}
+
+    // Info tab
+    renderInfoTab(c);
+    renderEvidenceTab(c);
+    renderTimelineTab(c);
+    
+    // Status select
+    const ss=document.getElementById('status-select');
+    if(ss)ss.value=c.status||'detected';
+    
+    // Show Info tab by default
+    switchModalTab('info',document.querySelector('.modal-tab'));
+    
+  }catch(err){
+    document.getElementById('modal-loading').style.display='none';
+    const errEl=document.getElementById('modal-error');
+    errEl.style.display='block';
+    errEl.innerHTML='<div class="empty-state"><p>Failed to load case: '+err.message+'</p></div>';
+  }
+}
+
+function renderInfoTab(c){
+  const grid=document.getElementById('detail-grid');
+  const violationLabel=(c.violation_class||'').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase());
+  const zoneLabel=(c.zone_type||'').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase());
+  const sts=(c.status||'').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase());
+  
+  grid.innerHTML=`
+    <div class="detail-field"><div class="field-label">Violation Class</div><div class="field-value">${violationLabel||'—'}</div></div>
+    <div class="detail-field"><div class="field-label">Zone Type</div><div class="field-value">${zoneLabel||'—'}</div></div>
+    <div class="detail-field"><div class="field-label">Area</div><div class="field-value">${c.area_m2?c.area_m2.toFixed(1)+' m²':'—'}</div></div>
+    <div class="detail-field"><div class="field-label">Confidence</div><div class="field-value">${c.confidence?(c.confidence*100).toFixed(0)+'%':'—'}</div></div>
+    <div class="detail-field"><div class="field-label">Status</div><div class="field-value"><span class="status-dot ${c.status}" style="vertical-align:middle;margin-right:4px;"></span>${sts||'—'}</div></div>
+    <div class="detail-field"><div class="field-label">Assigned To</div><div class="field-value">${c.assigned_to||'Unassigned'}</div></div>
+    <div class="detail-field full-width"><div class="field-label">Description</div><div class="field-value" style="font-weight:400;font-size:13px;line-height:1.5;">${c.description||'No description'}</div></div>
+    <div class="detail-field full-width"><div class="field-label">Created</div><div class="field-value" style="font-weight:400;font-size:12px;color:var(--text-secondary)">${c.created_at?new Date(c.created_at).toLocaleString():'—'}</div></div>
+  `;
+}
+
+function renderEvidenceTab(c){
+  const gallery=document.getElementById('evidence-gallery');
+  const empty=document.getElementById('evidence-empty');
+  const hint=document.getElementById('evidence-hint');
+  if(!c.evidence||!c.evidence.length){
+    gallery.innerHTML='';empty.style.display='block';
+    if(hint)hint.style.display='none';
+    return;
+  }
+  if(hint)hint.style.display='block';
+  empty.style.display='none';
+  lightboxImages=c.evidence;
+  gallery.innerHTML=c.evidence.map((ev,i)=>`
+    <div class="evidence-card" onclick="openLightbox(${i})">
+      <div class="ev-img-wrap">
+        <img src="${ev.image_url||''}" alt="${ev.description||'Evidence'}" loading="lazy"
+             onerror="this.parentElement.innerHTML='<span style=\\"color:#8899B4;font-size:20px;\\">📷</span>'">
+      </div>
+      <div class="ev-info">
+        <div class="ev-type">${(ev.evidence_type||'').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</div>
+        <div class="ev-desc">${ev.description||''}${ev.uploaded_by?' — '+ev.uploaded_by:''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderTimelineTab(c){
+  const container=document.getElementById('timeline-container');
+  // Build a timeline from case metadata
+  const events=[
+    {time:c.created_at,title:'Violation Detected',desc:'AI change detection identified '+c.violation_class.replace(/_/g,' ')+' covering '+c.area_m2+'m²',status:'completed'},
+  ];
+  if(c.assigned_to){
+    events.push({time:c.updated_at,title:'Assigned to '+c.assigned_to,desc:'Enforcement officer assigned for field verification',status:c.status==='assigned'||c.status==='field_verified'||c.status==='enforcement_ready'||c.status==='notice_issued'?'completed':'active'});
+  }
+  if(c.status==='field_verified'||c.status==='enforcement_ready'||c.status==='notice_issued'||c.status==='resolved'||c.status==='escalated'){
+    events.push({time:c.updated_at,title:'Field Verified',desc:'On-site inspection completed',status:'completed'});
+  }
+  if(c.status==='enforcement_ready'||c.status==='notice_issued'||c.status==='resolved'){
+    events.push({time:c.updated_at,title:'Enforcement Ready',desc:'Case prepared for enforcement action',status:'completed'});
+  }
+  if(c.status==='notice_issued'||c.status==='resolved'){
+    events.push({time:c.updated_at,title:'Notice Issued',desc:'Enforcement notice generated and dispatched',status:'completed'});
+  }
+  if(c.status==='resolved'){
+    events.push({time:c.updated_at,title:'Resolved ✓',desc:'Case closed. Violation addressed.',status:'completed'});
+  }
+  if(c.status==='escalated'){
+    events.push({time:c.updated_at,title:'Escalated ⚠️',desc:'Case referred to higher authority',status:'completed'});
+  }
+  
+  container.innerHTML=events.map(e=>`
+    <div class="timeline-item ${e.status}">
+      <div class="timeline-dot">${e.status==='completed'?'✓':''}</div>
+      <div class="timeline-time">${e.time?new Date(e.time).toLocaleString():''}</div>
+      <div class="timeline-title">${e.title}</div>
+      <div class="timeline-desc">${e.desc}</div>
+    </div>
+  `).join('');
+  
+  if(!events.length)container.innerHTML='<p style="color:var(--text-muted);font-size:13px;">No timeline data available.</p>';
+}
+
+function switchModalTab(tab,btn){
+  document.querySelectorAll('.modal-tab').forEach(t=>t.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  ['info','evidence','timeline','notice'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display=t===tab?'block':'none';
+  });
+}
+
+function closeModal(e){
+  if(e&&e.target!==e.currentTarget)return;
+  document.getElementById('case-modal').classList.remove('open');
+  currentCaseId=null;
+}
+
+async function updateStatus(){
+  if(!currentCaseId)return;
+  const s=document.getElementById('status-select').value;
+  try{
+    await api('/cases/'+currentCaseId+'/status',{method:'PATCH',body:JSON.stringify({status:s})});
+    showToast('Status updated to '+s.replace(/_/g,' '),'success');
+    openCaseModal(currentCaseId);loadCases();loadStats();
+  }catch(err){showToast('Failed: '+err.message,'error');}
+}
+
+// ================================================================
+// LIGHTBOX
+// ================================================================
+function openLightbox(index){
+  lightboxIndex=index;
+  const lb=document.getElementById('lightbox');
+  const img=document.getElementById('lightbox-img');
+  const ev=lightboxImages[index];
+  if(!ev)return;
+  img.src=ev.image_url||'';
+  document.getElementById('lb-info').textContent=(ev.evidence_type||'').replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())+(ev.description?' — '+ev.description:'');
+  document.getElementById('lb-prev').style.display=lightboxImages.length>1?'flex':'none';
+  document.getElementById('lb-next').style.display=lightboxImages.length>1?'flex':'none';
+  lb.classList.add('open');
+}
+function closeLightbox(e){
+  if(e&&e.target!==e.currentTarget)return;
+  document.getElementById('lightbox').classList.remove('open');
+}
+function navigateLightbox(dir){
+  const i=lightboxIndex+dir;
+  if(i<0||i>=lightboxImages.length)return;
+  openLightbox(i);
+}
+
+// ================================================================
+// NOTICES
+// ================================================================
+async function downloadNotice(){
+  if(!currentCaseId)return;
+  try{
+    const res=await fetch(API_BASE+'/cases/'+currentCaseId+'/notice',{
+      headers:token?{'Authorization':'Bearer '+token}:{},
+    });
+    if(!res.ok)throw new Error('Failed to generate notice');
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='notice_case_'+currentCaseId+'.pdf';
+    a.click();URL.revokeObjectURL(url);
+    showToast('Notice PDF downloaded','success');
+  }catch(err){showToast('Failed: '+err.message,'error');}
+}
+
+async function bulkGenerateNotices(){
+  const btn=document.getElementById('btn-bulk-notice');
+  if(btn){btn.disabled=true;btn.textContent='⏳...';}
+  showToast('Generating notice PDFs...','info');
+  try{
+    const body={};
+    if(activeFilter==='critical')body.severity='critical';
+    else if(activeFilter==='heritage')body.zone_type='heritage';
+    else if(activeFilter==='resolved')body.status='resolved';
+    else if(activeFilter!=='all')body.status=activeFilter;
+    
+    const res=await fetch(API_BASE+'/cases/notices/bulk',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',...(token?{'Authorization':'Bearer '+token}:{})},
+      body:JSON.stringify(body),
+    });
+    if(!res.ok){const e=await res.json().catch(()=>({detail:res.statusText}));throw new Error(e.detail||'Failed');}
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;
+    const disp=res.headers.get('content-disposition')||'';
+    const m=disp.match(/filename="?([^";]+)"?/);
+    a.download=m?m[1]:'ada_notices_'+new Date().toISOString().slice(0,10)+'.zip';
+    a.click();URL.revokeObjectURL(url);
+    showToast('Bulk notices ZIP downloaded','success');
+  }catch(err){showToast('Failed: '+err.message,'error');}
+  finally{if(btn){btn.disabled=false;btn.textContent='📄 Bulk';}}
+}
+
+// ================================================================
+// PWA
+// ================================================================
+if('serviceWorker'in navigator){
+  navigator.serviceWorker.register('/dashboard/sw.js').catch(e=>console.log('SW:',e));
+}
+window.addEventListener('offline',()=>document.getElementById('offline-badge')?.classList.add('show'));
+window.addEventListener('online',()=>document.getElementById('offline-badge')?.classList.remove('show'));
+
+// ================================================================
+// INIT
+// ================================================================
+(async function(){
+  await loadTranslations(currentLang);
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
+  const lb=document.getElementById('lang-'+currentLang);if(lb)lb.classList.add('active');
+  const savedToken=localStorage.getItem('ada_token');
+  const savedUser=localStorage.getItem('ada_user');
+  if(savedToken&&savedUser){
+    token=savedToken;user=JSON.parse(savedUser);
+    showDashboard();loadDashboard();
+  }
+})();
+</script>
+</body>
+</html>
