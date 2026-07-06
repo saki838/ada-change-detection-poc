@@ -1,0 +1,2 @@
+# Keeps inference/models/ in git. The trained demo checkpoint
+# (change_unet_resnet34.pt / .safetensors) is produced locally and gitignored.

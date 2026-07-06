@@ -1,0 +1,2 @@
+# Keeps inference/app/weights/ in git. Downloaded encoder weights
+# (*.pth / *.safetensors) are cached here and gitignored.

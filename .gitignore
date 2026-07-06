@@ -1,31 +1,39 @@
-__pycache__/
-*.pyc
+# ---- Python ----
+**/__pycache__/
+*.py[cod]
+*.egg-info/
 .pytest_cache/
+
+# ---- Virtualenvs ----
+*.venv
 .venv/
 venv/
-*.egg-info/
 
-# large / generated — don't commit
-weights/*.pt
-weights/*.safetensors
-data/levir_cd/**/*.png
-data/levir_cd/**/*.tif
-data/site/*.tif
-data/site/_synthetic_demo/
+# ---- Node / frontend ----
+node_modules/
+dist/
+.vite/
 
-# database — seed data, regenerate on deploy
-data/ada.db
-data/ada.db-shm
-data/ada.db-wal
-outputs/*/
-external/
+# ---- Env / secrets ----
+.env
 
-!weights/.gitkeep
-!data/levir_cd/**/.gitkeep
-!data/site/.gitkeep
-!outputs/.gitkeep
+# ---- Datasets (never commit raw OSCD or processed patches) ----
+inference/data/oscd/
+data/oscd/
+inference/data/processed/
 
-# temp scripts created by AI assistant
-_check_weights.py
-_cleanup_cache.py
-data/site/_levir_sample_test/
+# ---- Model weights (downloaded encoder + trained heads) ----
+**/weights/*.pth
+**/weights/*.safetensors
+**/models/*.pt
+**/models/*.safetensors
+
+# ---- Local databases ----
+*.db
+
+# ---- OS / editor cruft ----
+.DS_Store
+*.log
+BUILD_GUIDE.md
+Makefile
+RUN_STATUS.md
