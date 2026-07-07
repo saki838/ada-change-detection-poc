@@ -28,6 +28,10 @@ function boundsFromFeatures(fc) {
     if (f?.geometry?.coordinates) visit(f.geometry.coordinates);
   }
   if (!isFinite(minLat) || !isFinite(minLng)) return null;
+  // Reject pixel-space coordinates: if any value falls outside the geographic
+  // range the polygons aren't georeferenced, so signal "no geo" and let the
+  // caller fall back to the raw pixel mask image instead of a broken map.
+  if (minLat < -90 || maxLat > 90 || minLng < -180 || maxLng > 180) return null;
   return L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
 }
 

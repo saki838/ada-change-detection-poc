@@ -1,7 +1,13 @@
 FROM python:3.13-slim
 
-# System libs for rasterio (GDAL) + opencv headless runtime
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# System libs for rasterio (GDAL) + opencv headless runtime.
+# Debian's fastly CDN drops large .deb fetches (libboost) when apt pipelines
+# requests over one keep-alive connection inside Docker. Disabling pipelining
+# (Pipeline-Depth 0) forces sequential fetches and cures the "Connection failed".
+RUN printf 'Acquire::http::Pipeline-Depth "0";\nAcquire::http::No-Cache "true";\nAcquire::Retries "8";\n' \
+        > /etc/apt/apt.conf.d/99-fix-cdn-drops && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
         gdal-bin libgdal-dev libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 

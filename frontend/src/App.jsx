@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "./auth.js";
+import { useAuth } from "./auth.jsx";
 import Login from "./components/Login.jsx";
 import UploadPair from "./components/UploadPair.jsx";
 import MapView from "./components/MapView.jsx";

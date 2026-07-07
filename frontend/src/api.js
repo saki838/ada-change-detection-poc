@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getToken, setToken } from "./auth.js";
+import { getToken, setToken } from "./auth.jsx";
 
 // Single axios instance. baseURL "/api" is forwarded to the gateway (:8000) by the
 // Vite dev proxy and by nginx in the prod build. The browser only ever talks to /api.

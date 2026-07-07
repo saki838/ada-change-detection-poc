@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { AuthProvider } from "./auth.js";
+import { AuthProvider } from "./auth.jsx";
 import App from "./App.jsx";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";

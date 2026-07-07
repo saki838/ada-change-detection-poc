@@ -58,11 +58,14 @@ class PredictRequest(BaseModel):
     min_area_px: int = 20
 
 
-def _decode_image(b64: str) -> np.ndarray:
-    """Base64 -> HxWx3 uint8 RGB numpy array.
+def _decode_image(b64: str) -> tuple[np.ndarray, list[float] | None]:
+    """Base64 -> (HxWx3 uint8 RGB array, GDAL geotransform or None).
 
     Reads GeoTIFF (via rasterio, preserving band order) or ordinary PNG/JPG
-    (via Pillow). Returns an RGB array; alpha is dropped downstream.
+    (via Pillow). Returns an RGB array; alpha is dropped downstream. When the
+    source is a georeferenced GeoTIFF (has a CRS and a non-identity transform),
+    also returns its 6-float GDAL geotransform so polygons can be mapped from
+    pixel space into CRS coordinates; otherwise the transform is None.
     """
     raw = base64.b64decode(b64)
 
@@ -84,14 +87,19 @@ def _decode_image(b64: str) -> np.ndarray:
                 amax = float(arr.max())
                 arr = (arr / amax * 255.0) if amax > 0 else arr
                 arr = arr.astype(np.uint8)
-            return np.ascontiguousarray(arr)
+            # Capture the affine only when genuinely georeferenced; to_gdal()
+            # yields (c, a, b, f, d, e) — exactly the order _pixel_to_crs expects.
+            gt = None
+            if ds.crs is not None and not ds.transform.is_identity:
+                gt = [float(v) for v in ds.transform.to_gdal()]
+            return np.ascontiguousarray(arr), gt
     except Exception:
         pass
 
     from PIL import Image
 
     img = Image.open(io.BytesIO(raw)).convert("RGB")
-    return np.asarray(img, dtype=np.uint8)
+    return np.asarray(img, dtype=np.uint8), None
 
 
 def _encode_mask_png(mask: np.ndarray) -> str:
@@ -109,25 +117,29 @@ async def predict(req: PredictRequest) -> dict:
     """Core handler: decode -> validate -> branch on mode -> vectorize -> respond."""
     t0 = time.perf_counter()
     try:
-        t1 = _decode_image(req.t1_b64)
-        t2 = _decode_image(req.t2_b64)
+        t1, gt1 = _decode_image(req.t1_b64)
+        t2, _ = _decode_image(req.t2_b64)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"could not decode image: {exc}") from exc
 
     if t1.shape[:2] != t2.shape[:2]:
         raise HTTPException(status_code=400, detail="image size mismatch")
 
+    # Prefer an explicit gateway-supplied geotransform; otherwise use the one
+    # read from the T1 GeoTIFF so polygons come back in CRS (lng/lat) space.
+    geotransform = req.geotransform if req.geotransform is not None else gt1
+
     try:
         if req.mode == "ml":
             mask, polygons, total_area_m2 = run_ml_predict(
                 t1, t2, req.threshold, req.min_area_px,
-                req.pixel_size_m, req.crs, req.geotransform,
+                req.pixel_size_m, req.crs, geotransform,
             )
             model_name = "siamese_unet_resnet34"
         else:
             mask, polygons, total_area_m2 = run_diff_predict(
                 t1, t2, req.threshold, req.min_area_px,
-                req.pixel_size_m, req.crs, req.geotransform,
+                req.pixel_size_m, req.crs, geotransform,
             )
             model_name = "image_diff"
     except HTTPException:
